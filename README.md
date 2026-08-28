@@ -24,6 +24,13 @@ DevSync is a private developer accountability and growth platform designed to em
 - **Validation**: Input validation for name length, email format, duplicate detection, and valid IANA ZoneId timezones
 - **Standardized API Response & Exception Handling**: Centralized `ApiResponse<T>` wrapper and `@RestControllerAdvice` exception handler
 
+### Step 2B — Daily Progress & Accountability Domain
+- **Daily Progress Entity**: `DailyProgress` entity mapping `daily_progress` table with `@ManyToOne(fetch = FetchType.LAZY)` links to `User` and `Team`
+- **Progress Status**: Enum `ProgressStatus` (`IN_PROGRESS`, `COMPLETED`, `PARTIAL`)
+- **Database Uniqueness & Indexing**: `UNIQUE(user_id, team_id, progress_date)` constraint enforcing one entry per user/team per date in Flyway migration (`V3__create_daily_progress_schema.sql`)
+- **Business Validation**: Active team membership verification, `studyMinutes` limit (0-1440 mins), max 2000 text length constraints, and date range validation (`fromDate <= toDate`)
+- **Dynamic Paginated Filtering**: Spring Data JPA Specification (`DailyProgressSpecification`) supporting flexible query combinations (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`) with Pageable sorting defaults
+
 ---
 
 ## API Endpoints
@@ -41,6 +48,12 @@ DevSync is a private developer accountability and growth platform designed to em
 - `PUT /api/v1/teams/{id}` — Update team name or description
 - `POST /api/v1/teams/{teamId}/members/{userId}` — Add a user to a team (`MEMBER` role)
 - `GET /api/v1/teams/{teamId}/members` — Get paginated team members
+
+### Daily Progress APIs (`/api/v1/progress`)
+- `POST /api/v1/progress` — Record daily learning & task progress
+- `GET /api/v1/progress/{id}` — Get daily progress entry by UUID
+- `PUT /api/v1/progress/{id}` — Update progress details (what studied, completed, study minutes, status)
+- `GET /api/v1/progress` — Paginated & filtered list (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`, `page`, `size`, `sort`)
 
 ---
 
