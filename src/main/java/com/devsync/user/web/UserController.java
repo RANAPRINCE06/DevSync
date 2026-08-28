@@ -8,8 +8,11 @@ import com.devsync.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +47,10 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "Get paginated users", description = "Retrieve users list with pagination support")
-    public ResponseEntity<ApiResponse<Page<UserResponse>>> getUsers(Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<UserResponse>>> getUsers(
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
         Page<UserResponse> users = userService.getUsers(pageable);
         return ResponseEntity.ok(ApiResponse.success(users));
     }

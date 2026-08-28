@@ -6,8 +6,11 @@ import com.devsync.team.service.TeamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,7 +45,10 @@ public class TeamController {
 
     @GetMapping
     @Operation(summary = "Get paginated teams", description = "Retrieve teams list with pagination support")
-    public ResponseEntity<ApiResponse<Page<TeamResponse>>> getTeams(Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<TeamResponse>>> getTeams(
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
         Page<TeamResponse> teams = teamService.getTeams(pageable);
         return ResponseEntity.ok(ApiResponse.success(teams));
     }
@@ -70,6 +76,8 @@ public class TeamController {
     @Operation(summary = "Get team members", description = "Retrieve paginated list of team members for a team")
     public ResponseEntity<ApiResponse<Page<TeamMemberResponse>>> getTeamMembers(
             @PathVariable UUID teamId,
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "joinedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         Page<TeamMemberResponse> members = teamService.getTeamMembers(teamId, pageable);
         return ResponseEntity.ok(ApiResponse.success(members));

@@ -1,6 +1,5 @@
 package com.devsync.user.web;
 
-import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.GlobalExceptionHandler;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.user.dto.CreateUserRequest;
@@ -12,14 +11,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mapping.PropertyReferenceException;
+import org.springframework.data.util.TypeInformation;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -96,5 +104,60 @@ class UserControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("User not found"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users - default pagination page=0 size=10")
+    void getUsers_DefaultPagination() throws Exception {
+        Page<UserResponse> page = new PageImpl<>(List.of());
+        when(userService.getUsers(any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(userService).getUsers(PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users?page=0&size=10&sort=name,asc - sorting by name asc")
+    void getUsers_CustomSorting_NameAsc() throws Exception {
+        Page<UserResponse> page = new PageImpl<>(List.of());
+        when(userService.getUsers(any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/users?page=0&size=10&sort=name,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(userService).getUsers(PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "name")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users?page=0&size=10&sort=email,desc - sorting by email desc")
+    void getUsers_CustomSorting_EmailDesc() throws Exception {
+        Page<UserResponse> page = new PageImpl<>(List.of());
+        when(userService.getUsers(any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/users?page=0&size=10&sort=email,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(userService).getUsers(PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "email")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users - invalid sort property returns 400 Bad Request")
+    void getUsers_InvalidSortProperty_Returns400() throws Exception {
+        PropertyReferenceException prefEx = new PropertyReferenceException(
+                "invalidField",
+                TypeInformation.of(com.devsync.user.entity.User.class),
+                List.of()
+        );
+        when(userService.getUsers(any(Pageable.class))).thenThrow(prefEx);
+
+        mockMvc.perform(get("/api/v1/users?page=0&size=10&sort=invalidField,asc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Invalid sort property: 'invalidField'"));
     }
 }
