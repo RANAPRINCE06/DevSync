@@ -31,6 +31,14 @@ DevSync is a private developer accountability and growth platform designed to em
 - **Business Validation**: Active team membership verification, `studyMinutes` limit (0-1440 mins), max 2000 text length constraints, and date range validation (`fromDate <= toDate`)
 - **Dynamic Paginated Filtering**: Spring Data JPA Specification (`DailyProgressSpecification`) supporting flexible query combinations (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`) with Pageable sorting defaults
 
+### Step 2C — Goals & Task Management Domain
+- **Goal Domain**: `Goal` entity mapping `goals` table with `GoalStatus` (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `ON_HOLD`, `CANCELLED`) and `GoalPriority` (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+- **Goal Business Rules**: Owner active team membership validation, date range validation (`startDate <= targetDate`), 0-100 progress percentage range, automatic transition to `COMPLETED` when progress reaches 100%, and soft deletion (`active = false`).
+- **Task Domain**: `Task` entity mapping `tasks` table with `TaskStatus` (`TODO`, `IN_PROGRESS`, `COMPLETED`, `BLOCKED`, `CANCELLED`) and `TaskPriority` (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+- **Task Business Rules**: Direct derivation of Team from Goal, active assignee team membership verification, `dueDate` validation against Goal `startDate`, minute constraints (0-1440), automatic `completedAt` timestamp lifecycle management, and soft deletion (`active = false`).
+- **Database Migrations**: Flyway migrations `V4__create_goals_schema.sql` and `V5__create_tasks_schema.sql` with check constraints and performance indexes.
+- **Dynamic Paginated Filtering**: Spring Data JPA Specifications (`GoalSpecification`, `TaskSpecification`) with Pageable sorting defaults.
+
 ---
 
 ## API Endpoints
@@ -54,6 +62,20 @@ DevSync is a private developer accountability and growth platform designed to em
 - `GET /api/v1/progress/{id}` — Get daily progress entry by UUID
 - `PUT /api/v1/progress/{id}` — Update progress details (what studied, completed, study minutes, status)
 - `GET /api/v1/progress` — Paginated & filtered list (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`, `page`, `size`, `sort`)
+
+### Goal APIs (`/api/v1/goals`)
+- `POST /api/v1/goals` — Create a learning/development goal for a team
+- `GET /api/v1/goals/{id}` — Get goal details by UUID
+- `PUT /api/v1/goals/{id}` — Update goal title, description, dates, priority, progress, or status
+- `DELETE /api/v1/goals/{id}` — Soft delete (deactivate) goal
+- `GET /api/v1/goals` — Paginated & filtered list (`ownerId`, `teamId`, `status`, `priority`, `active`, `startDate`, `targetDate`, `page`, `size`, `sort`)
+
+### Task APIs (`/api/v1/tasks`)
+- `POST /api/v1/tasks` — Create a task under an active goal (team derived automatically)
+- `GET /api/v1/tasks/{id}` — Get task details by UUID
+- `PUT /api/v1/tasks/{id}` — Update task details, priority, due date, status, or actual minutes
+- `DELETE /api/v1/tasks/{id}` — Soft delete (deactivate) task
+- `GET /api/v1/tasks` — Paginated & filtered list (`goalId`, `assigneeId`, `teamId`, `status`, `priority`, `dueDate`, `active`, `page`, `size`, `sort`)
 
 ---
 
