@@ -3,13 +3,13 @@ import { User } from '@/types/user';
 import { Team } from '@/types/team';
 import { userApi } from '@/services/userApi';
 import { teamApi } from '@/services/teamApi';
+import { useAuth } from './AuthContext';
 
 interface AppContextType {
   activeUser: User | null;
   activeTeam: Team | null;
   users: User[];
   teams: Team[];
-  setActiveUser: (user: User | null) => void;
   setActiveTeam: (team: Team | null) => void;
   isLoading: boolean;
   refreshUsersAndTeams: () => Promise<void>;
@@ -18,7 +18,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeUser, setActiveUser] = useState<User | null>(null);
+  const { user: authUser } = useAuth();
   const [activeTeam, setActiveTeam] = useState<Team | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -33,11 +33,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ]);
 
       if (usersRes.status === 'fulfilled' && usersRes.value.content.length > 0) {
-        const fetchedUsers = usersRes.value.content;
-        setUsers(fetchedUsers);
-        if (!activeUser) {
-          setActiveUser(fetchedUsers[0]);
-        }
+        setUsers(usersRes.value.content);
       }
 
       if (teamsRes.status === 'fulfilled' && teamsRes.value.content.length > 0) {
@@ -56,16 +52,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     refreshUsersAndTeams();
-  }, []);
+  }, [authUser]);
 
   return (
     <AppContext.Provider
       value={{
-        activeUser,
+        activeUser: authUser,
         activeTeam,
         users,
         teams,
-        setActiveUser,
         setActiveTeam,
         isLoading,
         refreshUsersAndTeams,
