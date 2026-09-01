@@ -45,3 +45,13 @@ export const useUpdateCodingProfile = () => {
     },
   });
 };
+
+export const useDeleteCodingProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => codingProfileApi.deleteCodingProfile(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['codingProfiles'] });
+    },
+  });
+};
