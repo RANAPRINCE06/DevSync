@@ -1,14 +1,15 @@
-package com.devsync.notification.reminder.service;
+package com.devsync.reminder.service;
 
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
-import com.devsync.notification.reminder.dto.CreateReminderRequest;
-import com.devsync.notification.reminder.dto.ReminderResponse;
-import com.devsync.notification.reminder.dto.UpdateReminderRequest;
-import com.devsync.notification.reminder.entity.Reminder;
-import com.devsync.notification.reminder.entity.ReminderType;
-import com.devsync.notification.reminder.repository.ReminderRepository;
-import com.devsync.notification.reminder.repository.ReminderSpecification;
+import com.devsync.reminder.dto.CreateReminderRequest;
+import com.devsync.reminder.dto.ReminderResponse;
+import com.devsync.reminder.dto.UpdateReminderRequest;
+import com.devsync.reminder.entity.Reminder;
+import com.devsync.reminder.entity.ReminderStatus;
+import com.devsync.reminder.entity.ReminderType;
+import com.devsync.reminder.repository.ReminderRepository;
+import com.devsync.reminder.repository.ReminderSpecification;
 import com.devsync.team.entity.Team;
 import com.devsync.team.entity.TeamMember;
 import com.devsync.team.repository.TeamMemberRepository;
@@ -21,6 +22,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,15 +52,12 @@ public class ReminderServiceImpl implements ReminderService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getUserId()));
 
-        Team team = null;
-        if (request.getTeamId() != null) {
-            team = teamRepository.findById(request.getTeamId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
+        Team team = teamRepository.findById(request.getTeamId())
+                .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
 
-            Optional<TeamMember> memberOpt = teamMemberRepository.findByUserIdAndTeamId(user.getId(), team.getId());
-            if (memberOpt.isEmpty() || !memberOpt.get().isActive()) {
-                throw new BadRequestException("User is not an active member of team '" + team.getName() + "'");
-            }
+        Optional<TeamMember> memberOpt = teamMemberRepository.findByUserIdAndTeamId(user.getId(), team.getId());
+        if (memberOpt.isEmpty() || !memberOpt.get().isActive()) {
+            throw new BadRequestException("User is not an active member of team '" + team.getName() + "'");
         }
 
         try {
@@ -67,27 +66,21 @@ public class ReminderServiceImpl implements ReminderService {
             throw new BadRequestException("Invalid IANA timezone: " + request.getTimezone());
         }
 
-        boolean duplicateExists;
-        if (request.getTeamId() != null) {
-            duplicateExists = reminderRepository.existsByUserIdAndTypeAndTeamIdAndReminderTimeAndActiveTrue(
-                    user.getId(), request.getType(), request.getTeamId(), request.getReminderTime());
-        } else {
-            duplicateExists = reminderRepository.existsByUserIdAndTypeAndTeamIsNullAndReminderTimeAndActiveTrue(
-                    user.getId(), request.getType(), request.getReminderTime());
-        }
-
-        if (duplicateExists) {
-            throw new BadRequestException("Active reminder already exists for user with type " + request.getType() + " at " + request.getReminderTime());
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new BadRequestException("Start date cannot be after end date");
         }
 
         Reminder reminder = Reminder.builder()
                 .user(user)
                 .team(team)
                 .type(request.getType())
+                .status(ReminderStatus.ACTIVE)
                 .title(request.getTitle().trim())
                 .message(request.getMessage() != null ? request.getMessage().trim() : null)
                 .reminderTime(request.getReminderTime())
                 .timezone(request.getTimezone().trim())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
                 .active(true)
                 .build();
 
@@ -115,11 +108,22 @@ public class ReminderServiceImpl implements ReminderService {
             throw new BadRequestException("Invalid IANA timezone: " + request.getTimezone());
         }
 
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new BadRequestException("Start date cannot be after end date");
+        }
+
         reminder.setTitle(request.getTitle().trim());
         reminder.setMessage(request.getMessage() != null ? request.getMessage().trim() : null);
         reminder.setReminderTime(request.getReminderTime());
         reminder.setTimezone(request.getTimezone().trim());
-        reminder.setActive(request.getActive());
+        reminder.setStartDate(request.getStartDate());
+        reminder.setEndDate(request.getEndDate());
+        reminder.setStatus(request.getStatus());
+        if (request.getStatus() == ReminderStatus.CANCELLED) {
+            reminder.setActive(false);
+        } else if (request.getStatus() == ReminderStatus.ACTIVE) {
+            reminder.setActive(true);
+        }
 
         Reminder saved = reminderRepository.save(reminder);
         return ReminderResponse.fromEntity(saved);
@@ -131,13 +135,14 @@ public class ReminderServiceImpl implements ReminderService {
         Reminder reminder = reminderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reminder not found with id: " + id));
         reminder.setActive(false);
+        reminder.setStatus(ReminderStatus.CANCELLED);
         reminderRepository.save(reminder);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ReminderResponse> getUserReminders(UUID userId, UUID teamId, ReminderType type, Boolean active, Pageable pageable) {
-        Specification<Reminder> spec = ReminderSpecification.filter(userId, teamId, type, active);
+    public Page<ReminderResponse> getReminders(UUID userId, UUID teamId, ReminderType type, ReminderStatus status, Boolean active, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        Specification<Reminder> spec = ReminderSpecification.filter(userId, teamId, type, status, active, startDate, endDate);
         return reminderRepository.findAll(spec, pageable).map(ReminderResponse::fromEntity);
     }
 }

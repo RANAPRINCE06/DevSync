@@ -15,13 +15,15 @@ public interface NotificationService {
 
     NotificationResponse getNotificationById(UUID id);
 
-    Page<NotificationResponse> getUserNotifications(UUID userId, NotificationType type, NotificationStatus status, Pageable pageable);
+    Page<NotificationResponse> getNotifications(UUID userId, NotificationType type, NotificationStatus status, Pageable pageable);
+
+    Page<NotificationResponse> getUnreadNotifications(UUID userId, Pageable pageable);
+
+    long getUnreadCount(UUID userId);
 
     NotificationResponse markAsRead(UUID id);
 
     int markAllAsRead(UUID userId);
-
-    long getUnreadCount(UUID userId);
 
     void deleteNotification(UUID id);
 }

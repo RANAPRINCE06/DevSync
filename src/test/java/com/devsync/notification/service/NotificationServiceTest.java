@@ -4,7 +4,6 @@ import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.notification.dto.CreateNotificationRequest;
 import com.devsync.notification.dto.NotificationResponse;
 import com.devsync.notification.entity.Notification;
-import com.devsync.notification.entity.NotificationChannel;
 import com.devsync.notification.entity.NotificationStatus;
 import com.devsync.notification.entity.NotificationType;
 import com.devsync.notification.repository.NotificationRepository;
@@ -64,18 +63,15 @@ class NotificationServiceTest {
                 .id(notificationId)
                 .user(sampleUser)
                 .type(NotificationType.DAILY_REMINDER)
-                .channel(NotificationChannel.IN_APP)
-                .status(NotificationStatus.PENDING)
+                .status(NotificationStatus.UNREAD)
                 .title("Daily Progress Reminder")
                 .message("Please submit your daily progress")
-                .deleted(false)
                 .createdAt(Instant.now())
-                .updatedAt(Instant.now())
                 .build();
     }
 
     @Test
-    @DisplayName("createNotification - success with default PENDING status")
+    @DisplayName("createNotification - success with default UNREAD status")
     void createNotification_Success() {
         CreateNotificationRequest request = CreateNotificationRequest.builder()
                 .userId(userId)
@@ -92,8 +88,7 @@ class NotificationServiceTest {
         assertNotNull(response);
         assertEquals(notificationId, response.getId());
         assertEquals("Daily Progress Reminder", response.getTitle());
-        assertEquals(NotificationStatus.PENDING, response.getStatus());
-        assertEquals(NotificationChannel.IN_APP, response.getChannel());
+        assertEquals(NotificationStatus.UNREAD, response.getStatus());
         verify(notificationRepository).save(any(Notification.class));
     }
 
@@ -122,11 +117,11 @@ class NotificationServiceTest {
 
         assertNotNull(response);
         assertEquals(notificationId, response.getId());
-        assertEquals("Prince", response.getUserName());
+        assertEquals(userId, response.getUserId());
     }
 
     @Test
-    @DisplayName("getNotificationById - not found or deleted throws ResourceNotFoundException")
+    @DisplayName("getNotificationById - not found throws ResourceNotFoundException")
     void getNotificationById_NotFound_ThrowsException() {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.empty());
 
@@ -167,7 +162,7 @@ class NotificationServiceTest {
     @DisplayName("markAllAsRead - updates all unread notifications")
     void markAllAsRead_UpdatesAllUnread() {
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(notificationRepository.findByUserIdAndStatusInAndDeletedFalse(eq(userId), anyCollection()))
+        when(notificationRepository.findByUserIdAndStatus(userId, NotificationStatus.UNREAD))
                 .thenReturn(List.of(sampleNotification));
 
         int count = notificationService.markAllAsRead(userId);
@@ -182,7 +177,7 @@ class NotificationServiceTest {
     @DisplayName("getUnreadCount - returns count of unread notifications")
     void getUnreadCount_ReturnsCount() {
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(notificationRepository.countByUserIdAndStatusInAndDeletedFalse(eq(userId), anyCollection()))
+        when(notificationRepository.countByUserIdAndStatus(userId, NotificationStatus.UNREAD))
                 .thenReturn(3L);
 
         long count = notificationService.getUnreadCount(userId);
@@ -191,30 +186,45 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("deleteNotification - soft deletes notification by setting deleted=true")
-    void deleteNotification_SoftDeletes() {
+    @DisplayName("deleteNotification - deletes notification entity")
+    void deleteNotification_Deletes() {
         when(notificationRepository.findById(notificationId)).thenReturn(Optional.of(sampleNotification));
-        when(notificationRepository.save(any(Notification.class))).thenReturn(sampleNotification);
+        doNothing().when(notificationRepository).delete(sampleNotification);
 
         notificationService.deleteNotification(notificationId);
 
-        assertTrue(sampleNotification.isDeleted());
-        verify(notificationRepository).save(sampleNotification);
+        verify(notificationRepository).delete(sampleNotification);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    @DisplayName("getUserNotifications - paginated list excludes deleted")
-    void getUserNotifications_Success() {
+    @DisplayName("getNotifications - paginated list filtering")
+    void getNotifications_Success() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Notification> page = new PageImpl<>(List.of(sampleNotification));
 
         when(notificationRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-        Page<NotificationResponse> result = notificationService.getUserNotifications(userId, NotificationType.DAILY_REMINDER, NotificationStatus.PENDING, pageable);
+        Page<NotificationResponse> result = notificationService.getNotifications(userId, NotificationType.DAILY_REMINDER, NotificationStatus.UNREAD, pageable);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals("Daily Progress Reminder", result.getContent().get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("getUnreadNotifications - paginated unread list")
+    void getUnreadNotifications_Success() {
+        Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Notification> page = new PageImpl<>(List.of(sampleNotification));
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(notificationRepository.findByUserIdAndStatus(userId, NotificationStatus.UNREAD, pageable)).thenReturn(page);
+
+        Page<NotificationResponse> result = notificationService.getUnreadNotifications(userId, pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(NotificationStatus.UNREAD, result.getContent().get(0).getStatus());
     }
 }

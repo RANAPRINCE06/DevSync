@@ -1,9 +1,11 @@
-package com.devsync.notification.reminder.dto;
+package com.devsync.reminder.dto;
 
-import com.devsync.notification.reminder.entity.Reminder;
-import com.devsync.notification.reminder.entity.ReminderType;
+import com.devsync.reminder.entity.Reminder;
+import com.devsync.reminder.entity.ReminderStatus;
+import com.devsync.reminder.entity.ReminderType;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -12,34 +14,40 @@ public class ReminderResponse {
     private UUID id;
     private UUID userId;
     private String userName;
-    private String userEmail;
     private UUID teamId;
     private String teamName;
     private ReminderType type;
+    private ReminderStatus status;
     private String title;
     private String message;
     private LocalTime reminderTime;
     private String timezone;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private boolean active;
+    private Instant lastTriggeredAt;
     private Instant createdAt;
     private Instant updatedAt;
 
     public ReminderResponse() {
     }
 
-    public ReminderResponse(UUID id, UUID userId, String userName, String userEmail, UUID teamId, String teamName, ReminderType type, String title, String message, LocalTime reminderTime, String timezone, boolean active, Instant createdAt, Instant updatedAt) {
+    public ReminderResponse(UUID id, UUID userId, String userName, UUID teamId, String teamName, ReminderType type, ReminderStatus status, String title, String message, LocalTime reminderTime, String timezone, LocalDate startDate, LocalDate endDate, boolean active, Instant lastTriggeredAt, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.userId = userId;
         this.userName = userName;
-        this.userEmail = userEmail;
         this.teamId = teamId;
         this.teamName = teamName;
         this.type = type;
+        this.status = status;
         this.title = title;
         this.message = message;
         this.reminderTime = reminderTime;
         this.timezone = timezone;
+        this.startDate = startDate;
+        this.endDate = endDate;
         this.active = active;
+        this.lastTriggeredAt = lastTriggeredAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -49,15 +57,18 @@ public class ReminderResponse {
                 .id(reminder.getId())
                 .userId(reminder.getUser().getId())
                 .userName(reminder.getUser().getName())
-                .userEmail(reminder.getUser().getEmail())
-                .teamId(reminder.getTeam() != null ? reminder.getTeam().getId() : null)
-                .teamName(reminder.getTeam() != null ? reminder.getTeam().getName() : null)
+                .teamId(reminder.getTeam().getId())
+                .teamName(reminder.getTeam().getName())
                 .type(reminder.getType())
+                .status(reminder.getStatus())
                 .title(reminder.getTitle())
                 .message(reminder.getMessage())
                 .reminderTime(reminder.getReminderTime())
                 .timezone(reminder.getTimezone())
+                .startDate(reminder.getStartDate())
+                .endDate(reminder.getEndDate())
                 .active(reminder.isActive())
+                .lastTriggeredAt(reminder.getLastTriggeredAt())
                 .createdAt(reminder.getCreatedAt())
                 .updatedAt(reminder.getUpdatedAt())
                 .build();
@@ -87,14 +98,6 @@ public class ReminderResponse {
         this.userName = userName;
     }
 
-    public String getUserEmail() {
-        return userEmail;
-    }
-
-    public void setUserEmail(String userEmail) {
-        this.userEmail = userEmail;
-    }
-
     public UUID getTeamId() {
         return teamId;
     }
@@ -117,6 +120,14 @@ public class ReminderResponse {
 
     public void setType(ReminderType type) {
         this.type = type;
+    }
+
+    public ReminderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ReminderStatus status) {
+        this.status = status;
     }
 
     public String getTitle() {
@@ -151,12 +162,36 @@ public class ReminderResponse {
         this.timezone = timezone;
     }
 
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
     public boolean isActive() {
         return active;
     }
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public Instant getLastTriggeredAt() {
+        return lastTriggeredAt;
+    }
+
+    public void setLastTriggeredAt(Instant lastTriggeredAt) {
+        this.lastTriggeredAt = lastTriggeredAt;
     }
 
     public Instant getCreatedAt() {
@@ -183,15 +218,18 @@ public class ReminderResponse {
         private UUID id;
         private UUID userId;
         private String userName;
-        private String userEmail;
         private UUID teamId;
         private String teamName;
         private ReminderType type;
+        private ReminderStatus status = ReminderStatus.ACTIVE;
         private String title;
         private String message;
         private LocalTime reminderTime;
         private String timezone;
+        private LocalDate startDate;
+        private LocalDate endDate;
         private boolean active = true;
+        private Instant lastTriggeredAt;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -210,11 +248,6 @@ public class ReminderResponse {
             return this;
         }
 
-        public ReminderResponseBuilder userEmail(String userEmail) {
-            this.userEmail = userEmail;
-            return this;
-        }
-
         public ReminderResponseBuilder teamId(UUID teamId) {
             this.teamId = teamId;
             return this;
@@ -227,6 +260,11 @@ public class ReminderResponse {
 
         public ReminderResponseBuilder type(ReminderType type) {
             this.type = type;
+            return this;
+        }
+
+        public ReminderResponseBuilder status(ReminderStatus status) {
+            this.status = status;
             return this;
         }
 
@@ -250,8 +288,23 @@ public class ReminderResponse {
             return this;
         }
 
+        public ReminderResponseBuilder startDate(LocalDate startDate) {
+            this.startDate = startDate;
+            return this;
+        }
+
+        public ReminderResponseBuilder endDate(LocalDate endDate) {
+            this.endDate = endDate;
+            return this;
+        }
+
         public ReminderResponseBuilder active(boolean active) {
             this.active = active;
+            return this;
+        }
+
+        public ReminderResponseBuilder lastTriggeredAt(Instant lastTriggeredAt) {
+            this.lastTriggeredAt = lastTriggeredAt;
             return this;
         }
 
@@ -266,7 +319,7 @@ public class ReminderResponse {
         }
 
         public ReminderResponse build() {
-            return new ReminderResponse(id, userId, userName, userEmail, teamId, teamName, type, title, message, reminderTime, timezone, active, createdAt, updatedAt);
+            return new ReminderResponse(id, userId, userName, teamId, teamName, type, status, title, message, reminderTime, timezone, startDate, endDate, active, lastTriggeredAt, createdAt, updatedAt);
         }
     }
 }

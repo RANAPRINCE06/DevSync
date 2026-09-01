@@ -4,7 +4,6 @@ import com.devsync.common.exception.GlobalExceptionHandler;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.notification.dto.CreateNotificationRequest;
 import com.devsync.notification.dto.NotificationResponse;
-import com.devsync.notification.entity.NotificationChannel;
 import com.devsync.notification.entity.NotificationStatus;
 import com.devsync.notification.entity.NotificationType;
 import com.devsync.notification.service.NotificationService;
@@ -61,14 +60,11 @@ class NotificationControllerTest {
         NotificationResponse response = NotificationResponse.builder()
                 .id(notificationId)
                 .userId(userId)
-                .userName("Prince")
                 .type(NotificationType.DAILY_REMINDER)
-                .channel(NotificationChannel.IN_APP)
-                .status(NotificationStatus.PENDING)
+                .status(NotificationStatus.UNREAD)
                 .title("Submit Progress")
                 .message("Please update your daily work")
                 .createdAt(Instant.now())
-                .updatedAt(Instant.now())
                 .build();
 
         when(notificationService.createNotification(any(CreateNotificationRequest.class))).thenReturn(response);
@@ -79,7 +75,7 @@ class NotificationControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(notificationId.toString()))
-                .andExpect(jsonPath("$.data.status").value("PENDING"));
+                .andExpect(jsonPath("$.data.status").value("UNREAD"));
     }
 
     @Test
@@ -107,7 +103,7 @@ class NotificationControllerTest {
         NotificationResponse response = NotificationResponse.builder()
                 .id(notificationId)
                 .title("Submit Progress")
-                .status(NotificationStatus.PENDING)
+                .status(NotificationStatus.UNREAD)
                 .build();
 
         when(notificationService.getNotificationById(notificationId)).thenReturn(response);
@@ -128,6 +124,40 @@ class NotificationControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Notification not found"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/notifications - returns 200 OK paginated list")
+    void getNotifications_Returns200() throws Exception {
+        Page<NotificationResponse> page = new PageImpl<>(List.of());
+        when(notificationService.getNotifications(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/notifications?page=0&size=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/notifications/unread - returns 200 OK paginated list")
+    void getUnreadNotifications_Returns200() throws Exception {
+        Page<NotificationResponse> page = new PageImpl<>(List.of());
+        when(notificationService.getUnreadNotifications(any(), any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/notifications/unread?page=0&size=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/notifications/unread/count - returns 200 OK")
+    void getUnreadCount_Returns200() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(notificationService.getUnreadCount(userId)).thenReturn(4L);
+
+        mockMvc.perform(get("/api/v1/notifications/unread/count?userId=" + userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.unreadCount").value(4));
     }
 
     @Test
@@ -162,19 +192,7 @@ class NotificationControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/notifications/unread-count - returns 200 OK")
-    void getUnreadCount_Returns200() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(notificationService.getUnreadCount(userId)).thenReturn(3L);
-
-        mockMvc.perform(get("/api/v1/notifications/unread-count?userId=" + userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.unreadCount").value(3));
-    }
-
-    @Test
-    @DisplayName("DELETE /api/v1/notifications/{id} - soft deletes returns 200 OK")
+    @DisplayName("DELETE /api/v1/notifications/{id} - deletes notification returns 200 OK")
     void deleteNotification_Returns200() throws Exception {
         UUID notificationId = UUID.randomUUID();
         doNothing().when(notificationService).deleteNotification(notificationId);
@@ -183,16 +201,5 @@ class NotificationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Notification deleted successfully"));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/notifications - returns 200 OK paginated list")
-    void getNotifications_Returns200() throws Exception {
-        Page<NotificationResponse> page = new PageImpl<>(List.of());
-        when(notificationService.getUserNotifications(any(), any(), any(), any(Pageable.class))).thenReturn(page);
-
-        mockMvc.perform(get("/api/v1/notifications?page=0&size=10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
     }
 }

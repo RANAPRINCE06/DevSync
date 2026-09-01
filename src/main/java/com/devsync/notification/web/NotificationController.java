@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
-@Tag(name = "Notification Management", description = "Endpoints for creating, reading, batch marking, counting, and soft-deleting in-app notifications")
+@Tag(name = "Notification Management", description = "Endpoints for creating, viewing, marking, and deleting in-app notifications")
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -58,8 +58,27 @@ public class NotificationController {
             @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<NotificationResponse> page = notificationService.getUserNotifications(userId, type, status, pageable);
+        Page<NotificationResponse> page = notificationService.getNotifications(userId, type, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(page));
+    }
+
+    @GetMapping("/unread")
+    @Operation(summary = "Get unread notifications", description = "Retrieve unread notifications for a user")
+    public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getUnreadNotifications(
+            @RequestParam(required = false) @Parameter(description = "User UUID") UUID userId,
+            @ParameterObject
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+
+        Page<NotificationResponse> page = notificationService.getUnreadNotifications(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(page));
+    }
+
+    @GetMapping("/unread/count")
+    @Operation(summary = "Get unread notification count", description = "Get the number of unread notifications for a user")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(@RequestParam UUID userId) {
+        long count = notificationService.getUnreadCount(userId);
+        return ResponseEntity.ok(ApiResponse.success(Map.of("unreadCount", count)));
     }
 
     @PatchMapping("/{id}/read")
@@ -70,21 +89,14 @@ public class NotificationController {
     }
 
     @PatchMapping("/read-all")
-    @Operation(summary = "Mark all notifications as read", description = "Mark all pending/sent notifications for a user as read")
+    @Operation(summary = "Mark all notifications as read", description = "Mark all unread notifications for a user as read")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> markAllAsRead(@RequestParam UUID userId) {
         int updatedCount = notificationService.markAllAsRead(userId);
         return ResponseEntity.ok(ApiResponse.success("All notifications marked as read", Map.of("updatedCount", updatedCount)));
     }
 
-    @GetMapping("/unread-count")
-    @Operation(summary = "Get unread notification count", description = "Get the number of unread notifications for a user")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(@RequestParam UUID userId) {
-        long count = notificationService.getUnreadCount(userId);
-        return ResponseEntity.ok(ApiResponse.success(Map.of("unreadCount", count)));
-    }
-
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a notification", description = "Soft delete a notification by setting deleted=true")
+    @Operation(summary = "Delete a notification", description = "Delete a notification by UUID")
     public ResponseEntity<ApiResponse<Void>> deleteNotification(@PathVariable UUID id) {
         notificationService.deleteNotification(id);
         return ResponseEntity.ok(ApiResponse.success("Notification deleted successfully", null));

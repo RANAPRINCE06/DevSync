@@ -1,10 +1,12 @@
-package com.devsync.notification.reminder.dto;
+package com.devsync.reminder.dto;
 
+import com.devsync.reminder.entity.ReminderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 public class UpdateReminderRequest {
@@ -26,19 +28,29 @@ public class UpdateReminderRequest {
     @Schema(example = "Asia/Kolkata")
     private String timezone;
 
-    @NotNull(message = "Active state is required")
-    @Schema(example = "true")
-    private Boolean active;
+    @NotNull(message = "Start date is required")
+    @Schema(example = "2026-09-01")
+    private LocalDate startDate;
+
+    @NotNull(message = "End date is required")
+    @Schema(example = "2026-12-31")
+    private LocalDate endDate;
+
+    @NotNull(message = "Status is required")
+    @Schema(example = "ACTIVE")
+    private ReminderStatus status;
 
     public UpdateReminderRequest() {
     }
 
-    public UpdateReminderRequest(String title, String message, LocalTime reminderTime, String timezone, Boolean active) {
+    public UpdateReminderRequest(String title, String message, LocalTime reminderTime, String timezone, LocalDate startDate, LocalDate endDate, ReminderStatus status) {
         this.title = title;
         this.message = message;
         this.reminderTime = reminderTime;
         this.timezone = timezone;
-        this.active = active;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.status = status;
     }
 
     public String getTitle() {
@@ -73,12 +85,28 @@ public class UpdateReminderRequest {
         this.timezone = timezone;
     }
 
-    public Boolean getActive() {
-        return active;
+    public LocalDate getStartDate() {
+        return startDate;
     }
 
-    public void setActive(Boolean active) {
-        this.active = active;
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public ReminderStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ReminderStatus status) {
+        this.status = status;
     }
 
     public static UpdateReminderRequestBuilder builder() {
@@ -90,7 +118,9 @@ public class UpdateReminderRequest {
         private String message;
         private LocalTime reminderTime;
         private String timezone;
-        private Boolean active = true;
+        private LocalDate startDate;
+        private LocalDate endDate;
+        private ReminderStatus status = ReminderStatus.ACTIVE;
 
         public UpdateReminderRequestBuilder title(String title) {
             this.title = title;
@@ -112,13 +142,23 @@ public class UpdateReminderRequest {
             return this;
         }
 
-        public UpdateReminderRequestBuilder active(Boolean active) {
-            this.active = active;
+        public UpdateReminderRequestBuilder startDate(LocalDate startDate) {
+            this.startDate = startDate;
+            return this;
+        }
+
+        public UpdateReminderRequestBuilder endDate(LocalDate endDate) {
+            this.endDate = endDate;
+            return this;
+        }
+
+        public UpdateReminderRequestBuilder status(ReminderStatus status) {
+            this.status = status;
             return this;
         }
 
         public UpdateReminderRequest build() {
-            return new UpdateReminderRequest(title, message, reminderTime, timezone, active);
+            return new UpdateReminderRequest(title, message, reminderTime, timezone, startDate, endDate, status);
         }
     }
 }

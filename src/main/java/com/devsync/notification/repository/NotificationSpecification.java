@@ -21,13 +21,8 @@ public class NotificationSpecification {
         return (root, query, cb) -> status == null ? null : cb.equal(root.get("status"), status);
     }
 
-    public static Specification<Notification> withNotDeleted() {
-        return (root, query, cb) -> cb.isFalse(root.get("deleted"));
-    }
-
     public static Specification<Notification> filter(UUID userId, NotificationType type, NotificationStatus status) {
-        return Specification.where(withNotDeleted())
-                .and(withUserId(userId))
+        return Specification.where(withUserId(userId))
                 .and(withType(type))
                 .and(withStatus(status));
     }
