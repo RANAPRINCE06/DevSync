@@ -14,6 +14,8 @@ import {
   PlusCircle,
   Settings,
   Bell,
+  AlarmClock,
+  BarChart3,
 } from 'lucide-react';
 import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
@@ -51,6 +53,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { label: 'Leaderboard & Standings', path: '/leaderboard', icon: Trophy, category: 'Navigation' },
     { label: 'Achievements & Badges', path: '/achievements', icon: Medal, category: 'Navigation' },
     { label: 'Coding Profiles', path: '/coding-profiles', icon: Code2, category: 'Navigation' },
+    { label: 'Productivity Analytics', path: '/analytics', icon: BarChart3, category: 'Navigation' },
+    { label: 'Scheduled Reminders', path: '/reminders', icon: AlarmClock, category: 'Navigation' },
     { label: 'Notifications Feed', path: '/notifications', icon: Bell, category: 'Navigation' },
     { label: 'Settings & Preferences', path: '/settings', icon: Settings, category: 'Navigation' },
   ].filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
@@ -59,6 +63,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     { label: 'Log Today\'s Progress', path: '/progress', icon: PlusCircle, category: 'Quick Action' },
     { label: 'Create New Goal', path: '/goals', icon: PlusCircle, category: 'Quick Action' },
     { label: 'Create Sprint Task', path: '/tasks', icon: PlusCircle, category: 'Quick Action' },
+    { label: 'Schedule New Reminder', path: '/reminders', icon: PlusCircle, category: 'Quick Action' },
     { label: 'Link Coding Profile', path: '/coding-profiles', icon: PlusCircle, category: 'Quick Action' },
   ].filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
 
@@ -74,7 +79,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         category: 'Goals',
       })) || [];
 
-  const filteredTasks =
+  const filteredTasks: CommandItem[] =
     tasksPage?.content
       ?.filter((t) => t.title.toLowerCase().includes(query.toLowerCase()))
       .slice(0, 4)
@@ -86,7 +91,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         category: 'Tasks',
       })) || [];
 
-  const filteredUsers =
+  const filteredUsers: CommandItem[] =
     users
       .filter(
         (u) =>
@@ -194,7 +199,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
                     isSelected
                       ? 'bg-primary-600/20 text-slate-100 border border-primary-500/30'
-                      : 'text-slate-300 hover:bg-slate-800/70 border border-transparent'
+                      : 'text-slate-300 hover:bg-slate-850 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">

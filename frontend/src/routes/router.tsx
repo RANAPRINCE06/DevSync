@@ -13,6 +13,8 @@ import { TeamPage } from '@/pages/Team/TeamPage';
 import { LeaderboardPage } from '@/pages/Leaderboard/LeaderboardPage';
 import { AchievementsPage } from '@/pages/Achievements/AchievementsPage';
 import { CodingProfilesPage } from '@/pages/CodingProfiles/CodingProfilesPage';
+import { AnalyticsPage } from '@/pages/Analytics/AnalyticsPage';
+import { RemindersPage } from '@/pages/Reminders/RemindersPage';
 import { NotificationsPage } from '@/pages/Notifications/NotificationsPage';
 import { SettingsPage } from '@/pages/Settings/SettingsPage';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,6 +99,14 @@ export const router = createBrowserRouter([
           {
             path: 'coding-profiles',
             element: <CodingProfilesPage />,
+          },
+          {
+            path: 'analytics',
+            element: <AnalyticsPage />,
+          },
+          {
+            path: 'reminders',
+            element: <RemindersPage />,
           },
           {
             path: 'notifications',

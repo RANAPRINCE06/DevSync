@@ -14,8 +14,6 @@ import {
   CheckCircle2,
   Sliders,
   Edit2,
-  TrendingUp,
-  Zap,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -64,7 +62,6 @@ export const DashboardPage: React.FC = () => {
   });
   const todayProgress = progressPage?.content?.[0];
 
-  // 14 days progress for weekly focus chart & trends comparison
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 13);
   const weekStartStr = weekStart.toISOString().split('T')[0];
@@ -262,9 +259,25 @@ export const DashboardPage: React.FC = () => {
 
   const currentWeekTotalMinutes = last7Days.reduce((acc, curr) => acc + curr.minutes, 0);
   const maxFocusMinutes = Math.max(...last7Days.map((d) => d.minutes), 120);
-
-  // Calculate highest productivity day
   const bestDay = [...last7Days].sort((a, b) => b.minutes - a.minutes)[0];
+
+  // Productivity Score Calculation (0-100)
+  const focusScore = Math.min(Math.round(((todayProgress?.studyMinutes || 0) / 120) * 40), 40);
+  const taskScore = Math.min(Math.round((taskCompletionRate / 100) * 30), 30);
+  const goalProgressAvg =
+    goalsPage?.content && goalsPage.content.length > 0
+      ? Math.round(goalsPage.content.reduce((acc, g) => acc + g.progress, 0) / goalsPage.content.length)
+      : 0;
+  const goalScore = Math.min(Math.round((goalProgressAvg / 100) * 20), 20);
+  const badgeScore = Math.min((userAchievements?.length || 0) * 5, 10);
+  const productivityScore = Math.min(focusScore + taskScore + goalScore + badgeScore, 100);
+
+  const getScoreInsight = (score: number) => {
+    if (score >= 85) return 'Exceptional velocity! Consistent focus and high milestone execution.';
+    if (score >= 65) return 'Strong focus today — sprint task completion is your biggest opportunity.';
+    if (score >= 40) return 'Good momentum — log completed tasks and goal updates to level up.';
+    return 'Start your study session and log focus hours to boost your score!';
+  };
 
   // Goals health check helper
   const getGoalHealth = (goal: Goal) => {
@@ -315,105 +328,56 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Key Metrics Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Today's Focus */}
-        <Card hoverable className="relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Today's Focus</span>
-            <div className="w-8 h-8 rounded-xl bg-primary-950/70 border border-primary-800/60 flex items-center justify-center text-primary-400">
-              <Clock className="w-4 h-4" />
+      {/* 2. Real-Time Productivity Score Banner */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Score Ring Card */}
+        <Card className="p-4 bg-gradient-to-br from-slate-900/90 to-primary-950/20 border-slate-800 flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+              Productivity Velocity
+            </span>
+            <div className="text-3xl font-extrabold text-slate-100">
+              {productivityScore}
+              <span className="text-sm font-normal text-slate-500"> / 100</span>
             </div>
+            <p className="text-[11px] text-primary-300">{getScoreInsight(productivityScore)}</p>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-100">
-              {todayProgress ? formatMinutes(todayProgress.studyMinutes) : '0m'}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-primary-400" />
-              {formatMinutes(currentWeekTotalMinutes)} this week
-            </p>
+
+          <div className="relative w-16 h-16 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 shadow-glow shrink-0">
+            <span className="text-lg font-bold text-primary-400">{productivityScore}%</span>
           </div>
         </Card>
 
-        {/* Active Goals */}
-        <Card hoverable className="relative overflow-hidden group">
+        {/* Focus & Streak Breakdown */}
+        <Card className="p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Active Goals</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
-              <Target className="w-4 h-4" />
-            </div>
+            <span className="text-xs font-medium text-slate-400">Weekly Focus</span>
+            <Clock className="w-4 h-4 text-primary-400" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-100">
-              {isGoalsLoading ? <Skeleton className="h-8 w-12" /> : goalsPage?.totalElements || 0}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">In progress & target milestones</p>
+          <div className="text-2xl font-bold text-slate-100 mt-2">
+            {formatMinutes(currentWeekTotalMinutes)}
           </div>
-        </Card>
-
-        {/* Pending & Overdue Tasks */}
-        <Card hoverable className="relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Tasks in Pipeline</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
-              <CheckSquare className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-100">
-              {isTasksLoading ? <Skeleton className="h-8 w-12" /> : pendingTasksCount + inProgressTasksCount}
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {overdueTasksCount > 0 ? (
-                <span className="text-rose-400 font-medium">⚠️ {overdueTasksCount} overdue</span>
-              ) : (
-                `${completedTasksCount} completed recently`
-              )}
-            </p>
-          </div>
+          <p className="text-[11px] text-slate-500">
+            {bestDay && bestDay.minutes > 0 ? `Best day: ${bestDay.dayLabel} (${bestDay.minutes}m)` : '7-day active focus'}
+          </p>
         </Card>
 
         {/* Achievement Points */}
-        <Card hoverable className="relative overflow-hidden group">
+        <Card className="p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Achievement Points</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400">
-              <Flame className="w-4 h-4" />
-            </div>
+            <span className="text-xs font-medium text-slate-400">Leaderboard Points</span>
+            <Flame className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-100">
-              {totalPointsData?.totalPoints || 0} <span className="text-xs font-normal text-amber-400">pts</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Applied to team leaderboard</p>
+          <div className="text-2xl font-bold text-slate-100 mt-2">
+            {totalPointsData?.totalPoints || 0} <span className="text-xs font-normal text-amber-400">pts</span>
           </div>
+          <p className="text-[11px] text-slate-500">
+            {userAchievements?.length || 0} badges earned towards team standings
+          </p>
         </Card>
       </div>
 
-      {/* 3. Productivity Insights Banner */}
-      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-primary-950/40 via-slate-900/60 to-indigo-950/30 border border-primary-800/40 flex items-center justify-between gap-4 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary-900/60 border border-primary-700/60 flex items-center justify-center text-primary-300 shrink-0">
-            <Zap className="w-4 h-4 text-amber-400" />
-          </div>
-          <div>
-            <span className="font-bold text-slate-100 block">Productivity Insight</span>
-            <span className="text-slate-400">
-              {bestDay && bestDay.minutes > 0
-                ? `Your highest focus day this week was ${bestDay.dayLabel} with ${formatMinutes(bestDay.minutes)} logged.`
-                : 'Log daily focus sessions to build consistency and unlock team leaderboard boosts.'}
-            </span>
-          </div>
-        </div>
-        <Link to="/progress">
-          <Button variant="ghost" size="sm" rightIcon={<ArrowUpRight className="w-3.5 h-3.5" />}>
-            View Log
-          </Button>
-        </Link>
-      </div>
-
-      {/* 4. Analytics Section (7-Day Focus & Task Ring) */}
+      {/* 3. Analytics Section (7-Day Focus & Task Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: 7-Day Focus Bar Chart */}
         <Card className="lg:col-span-2">
@@ -513,7 +477,7 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* 5. Today's Accountability Card */}
+      {/* 4. Today's Accountability & Progress Card */}
       <Card className="bg-gradient-to-br from-slate-900/90 to-slate-900/40 border-slate-800">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -596,7 +560,7 @@ export const DashboardPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* 6. Active Goals with Health Status & Upcoming Tasks */}
+      {/* 5. Active Goals with Health Status & Upcoming Tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Active Goals */}
         <Card>
@@ -774,7 +738,7 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* 7. Team Leaderboard Podium & Recent Achievements */}
+      {/* 6. Team Leaderboard Podium & Recent Achievements */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Team Leaderboard Podium */}
         <Card className="lg:col-span-2">

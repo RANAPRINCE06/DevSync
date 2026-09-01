@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Bell,
   CheckCheck,
@@ -30,14 +30,13 @@ export const NotificationsPage: React.FC = () => {
   const { activeUser } = useApp();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [page, setPage] = useState(0);
 
   const { data: notificationsPage, isLoading } = useNotifications({
     userId: activeUser?.id,
-    status: activeTab === 'UNREAD' ? 'UNREAD' : activeTab === 'READ' ? 'READ' : undefined,
     page,
-    size: 15,
+    size: 30,
     sort: 'createdAt,desc',
   });
 
@@ -45,10 +44,13 @@ export const NotificationsPage: React.FC = () => {
   const markAllMutation = useMarkAllAsRead();
   const deleteMutation = useDeleteNotification();
 
-  const filterTabs = [
+  const categoryTabs = [
     { id: 'ALL', label: 'All Alerts' },
     { id: 'UNREAD', label: 'Unread' },
-    { id: 'READ', label: 'Archived / Read' },
+    { id: 'DAILY_REMINDER', label: 'Progress Reminders' },
+    { id: 'GOAL_REMINDER', label: 'Goals' },
+    { id: 'TASK_REMINDER', label: 'Tasks' },
+    { id: 'SYSTEM', label: 'System' },
   ];
 
   const handleMarkOneRead = async (notification: Notification) => {
@@ -93,7 +95,44 @@ export const NotificationsPage: React.FC = () => {
     }
   };
 
-  const notifications = notificationsPage?.content || [];
+  const allNotifications = notificationsPage?.content || [];
+
+  const filteredNotifications = useMemo(() => {
+    return allNotifications.filter((n) => {
+      if (activeCategory === 'ALL') return true;
+      if (activeCategory === 'UNREAD') return n.status === 'UNREAD';
+      return n.type === activeCategory;
+    });
+  }, [allNotifications, activeCategory]);
+
+  // Group notifications into Today, Yesterday, Earlier
+  const groupedNotifications = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+    const todayItems: Notification[] = [];
+    const yesterdayItems: Notification[] = [];
+    const earlierItems: Notification[] = [];
+
+    filteredNotifications.forEach((n) => {
+      const itemDate = n.createdAt ? n.createdAt.split('T')[0] : '';
+      if (itemDate === today) {
+        todayItems.push(n);
+      } else if (itemDate === yesterday) {
+        yesterdayItems.push(n);
+      } else {
+        earlierItems.push(n);
+      }
+    });
+
+    return [
+      { label: 'Today', items: todayItems },
+      { label: 'Yesterday', items: yesterdayItems },
+      { label: 'Earlier', items: earlierItems },
+    ].filter((g) => g.items.length > 0);
+  }, [filteredNotifications]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -115,7 +154,7 @@ export const NotificationsPage: React.FC = () => {
           leftIcon={<CheckCheck className="w-4 h-4" />}
           onClick={handleMarkAllRead}
           isLoading={markAllMutation.isPending}
-          disabled={!activeUser || notifications.length === 0}
+          disabled={!activeUser || allNotifications.length === 0}
         >
           Mark all as read
         </Button>
@@ -123,21 +162,21 @@ export const NotificationsPage: React.FC = () => {
 
       {/* 2. Filter Tabs */}
       <Tabs
-        tabs={filterTabs}
-        activeTab={activeTab}
+        tabs={categoryTabs}
+        activeTab={activeCategory}
         onChange={(tabId) => {
-          setActiveTab(tabId);
+          setActiveCategory(tabId);
           setPage(0);
         }}
       />
 
-      {/* 3. Notifications List */}
+      {/* 3. Notifications Stream */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between w-full">
             <CardTitle>Notification Stream</CardTitle>
             <span className="text-xs text-slate-500">
-              {notificationsPage?.totalElements || 0} total notifications
+              {filteredNotifications.length} alerts
             </span>
           </div>
         </CardHeader>
@@ -148,80 +187,89 @@ export const NotificationsPage: React.FC = () => {
               <Skeleton className="h-16 w-full" />
               <Skeleton className="h-16 w-full" />
             </div>
-          ) : notifications.length > 0 ? (
-            <div className="space-y-2.5">
-              {notifications.map((n) => {
-                const isUnread = n.status === 'UNREAD';
-                return (
-                  <div
-                    key={n.id}
-                    className={`p-4 rounded-xl border transition-all flex items-start justify-between gap-3 ${
-                      isUnread
-                        ? 'bg-slate-900/90 border-primary-800/40 shadow-sm'
-                        : 'bg-slate-950/30 border-slate-800/60 opacity-80'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 shrink-0 mt-0.5">
-                        {getTypeIcon(n.type)}
-                      </div>
-
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4
-                            className={`text-xs font-semibold ${
-                              isUnread ? 'text-slate-100' : 'text-slate-300'
-                            }`}
-                          >
-                            {n.title}
-                          </h4>
-                          {isUnread && (
-                            <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0" />
-                          )}
-                        </div>
-
-                        <p className="text-xs text-slate-400 leading-relaxed">{n.message}</p>
-
-                        <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-1">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {formatDate(n.createdAt)}
-                          </span>
-                          <span>•</span>
-                          <span className="uppercase font-mono tracking-wider">{n.type}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isUnread && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleMarkOneRead(n)}
-                          title="Mark as read"
+          ) : groupedNotifications.length > 0 ? (
+            <div className="space-y-6">
+              {groupedNotifications.map((group) => (
+                <div key={group.label} className="space-y-2.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block px-1">
+                    {group.label}
+                  </span>
+                  <div className="space-y-2">
+                    {group.items.map((n) => {
+                      const isUnread = n.status === 'UNREAD';
+                      return (
+                        <div
+                          key={n.id}
+                          className={`p-4 rounded-xl border transition-all flex items-start justify-between gap-3 ${
+                            isUnread
+                              ? 'bg-slate-900/90 border-primary-800/40 shadow-sm'
+                              : 'bg-slate-950/30 border-slate-800/60 opacity-80'
+                          }`}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-primary-400" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-rose-400"
-                        onClick={() => handleDelete(n.id)}
-                        title="Delete notification"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 shrink-0 mt-0.5">
+                              {getTypeIcon(n.type)}
+                            </div>
+
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4
+                                  className={`text-xs font-semibold ${
+                                    isUnread ? 'text-slate-100' : 'text-slate-300'
+                                  }`}
+                                >
+                                  {n.title}
+                                </h4>
+                                {isUnread && (
+                                  <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0" />
+                                )}
+                              </div>
+
+                              <p className="text-xs text-slate-400 leading-relaxed">{n.message}</p>
+
+                              <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-1">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(n.createdAt)}
+                                </span>
+                                <span>•</span>
+                                <span className="uppercase font-mono tracking-wider">{n.type}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isUnread && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleMarkOneRead(n)}
+                                title="Mark as read"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-primary-400" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-rose-400"
+                              onClick={() => handleDelete(n.id)}
+                              title="Delete notification"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
             <EmptyState
               icon={Bell}
-              title="No notifications"
+              title="No notifications in this category"
               description="You are completely caught up! New reminders and team milestones will appear here."
             />
           )}

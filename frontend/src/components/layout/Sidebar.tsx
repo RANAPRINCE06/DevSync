@@ -10,6 +10,8 @@ import {
   Medal,
   Code2,
   Bell,
+  AlarmClock,
+  BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -56,6 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { to: '/achievements', label: 'Achievements', icon: Medal },
     { to: '/coding-profiles', label: 'Coding Profiles', icon: Code2 },
+    { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { to: '/reminders', label: 'Reminders', icon: AlarmClock },
     {
       to: '/notifications',
       label: 'Notifications',
@@ -106,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsMobileOpen(false)}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 group relative',
+                    'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 group relative',
                     isActive
                       ? 'bg-primary-600/15 text-primary-300 font-semibold border border-primary-500/20'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'

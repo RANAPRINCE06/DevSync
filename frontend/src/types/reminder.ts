@@ -1,22 +1,22 @@
-export type ReminderType = 'DAILY_PROGRESS' | 'GOAL' | 'TASK';
+export type ReminderType = 'DAILY_PROGRESS' | 'GOAL_CHECKIN' | 'TASK_DUE' | 'CUSTOM';
 export type ReminderStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 
 export interface Reminder {
   id: string;
   userId: string;
   userName: string;
-  userEmail: string;
   teamId: string;
   teamName: string;
-  title: string;
-  message?: string | null;
   type: ReminderType;
   status: ReminderStatus;
-  reminderTime: string;
+  title: string;
+  message?: string | null;
+  reminderTime: string; // e.g. "09:00:00"
   timezone: string;
-  startDate: string;
+  startDate: string; // "YYYY-MM-DD"
   endDate?: string | null;
   active: boolean;
+  lastTriggeredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,24 +24,23 @@ export interface Reminder {
 export interface CreateReminderRequest {
   userId: string;
   teamId: string;
+  type: ReminderType;
   title: string;
   message?: string;
-  type: ReminderType;
-  reminderTime: string;
+  reminderTime: string; // "HH:mm" or "HH:mm:ss"
   timezone: string;
   startDate: string;
   endDate?: string;
 }
 
 export interface UpdateReminderRequest {
-  title: string;
+  title?: string;
   message?: string;
-  type: ReminderType;
-  status?: ReminderStatus;
-  reminderTime: string;
-  timezone: string;
-  startDate: string;
+  reminderTime?: string;
+  timezone?: string;
+  startDate?: string;
   endDate?: string;
+  status?: ReminderStatus;
   active?: boolean;
 }
 
