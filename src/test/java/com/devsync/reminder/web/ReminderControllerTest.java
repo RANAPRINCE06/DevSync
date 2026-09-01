@@ -1,12 +1,13 @@
-package com.devsync.notification.reminder.web;
+package com.devsync.reminder.web;
 
 import com.devsync.common.exception.GlobalExceptionHandler;
 import com.devsync.common.exception.ResourceNotFoundException;
-import com.devsync.notification.reminder.dto.CreateReminderRequest;
-import com.devsync.notification.reminder.dto.ReminderResponse;
-import com.devsync.notification.reminder.dto.UpdateReminderRequest;
-import com.devsync.notification.reminder.entity.ReminderType;
-import com.devsync.notification.reminder.service.ReminderService;
+import com.devsync.reminder.dto.CreateReminderRequest;
+import com.devsync.reminder.dto.ReminderResponse;
+import com.devsync.reminder.dto.UpdateReminderRequest;
+import com.devsync.reminder.entity.ReminderStatus;
+import com.devsync.reminder.entity.ReminderType;
+import com.devsync.reminder.service.ReminderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -49,24 +51,33 @@ class ReminderControllerTest {
     @DisplayName("POST /api/v1/reminders - returns 201 Created")
     void createReminder_Returns201() throws Exception {
         UUID userId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
         UUID reminderId = UUID.randomUUID();
 
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
+                .teamId(teamId)
                 .type(ReminderType.DAILY_PROGRESS)
                 .title("Submit Progress Reminder")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         ReminderResponse response = ReminderResponse.builder()
                 .id(reminderId)
                 .userId(userId)
                 .userName("Prince")
+                .teamId(teamId)
+                .teamName("DevSync Team")
                 .type(ReminderType.DAILY_PROGRESS)
+                .status(ReminderStatus.ACTIVE)
                 .title("Submit Progress Reminder")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .active(true)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -88,10 +99,13 @@ class ReminderControllerTest {
     void createReminder_ValidationFailure_Returns400() throws Exception {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(null)
+                .teamId(null)
                 .type(null)
                 .title("")
                 .reminderTime(null)
                 .timezone("")
+                .startDate(null)
+                .endDate(null)
                 .build();
 
         mockMvc.perform(post("/api/v1/reminders")
@@ -109,6 +123,7 @@ class ReminderControllerTest {
         ReminderResponse response = ReminderResponse.builder()
                 .id(reminderId)
                 .title("Submit Progress Reminder")
+                .status(ReminderStatus.ACTIVE)
                 .active(true)
                 .build();
 
@@ -140,7 +155,9 @@ class ReminderControllerTest {
                 .title("Updated Reminder")
                 .reminderTime(LocalTime.of(19, 0))
                 .timezone("Asia/Kolkata")
-                .active(true)
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
+                .status(ReminderStatus.ACTIVE)
                 .build();
 
         ReminderResponse response = ReminderResponse.builder()
@@ -148,6 +165,9 @@ class ReminderControllerTest {
                 .title("Updated Reminder")
                 .reminderTime(LocalTime.of(19, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
+                .status(ReminderStatus.ACTIVE)
                 .active(true)
                 .build();
 
@@ -162,7 +182,7 @@ class ReminderControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/reminders/{id} - soft deletes returns 200 OK")
+    @DisplayName("DELETE /api/v1/reminders/{id} - deactivates reminder returns 200 OK")
     void deleteReminder_Returns200() throws Exception {
         UUID reminderId = UUID.randomUUID();
         doNothing().when(reminderService).deactivateReminder(reminderId);
@@ -177,7 +197,7 @@ class ReminderControllerTest {
     @DisplayName("GET /api/v1/reminders - returns 200 OK paginated list")
     void getReminders_Returns200() throws Exception {
         Page<ReminderResponse> page = new PageImpl<>(List.of());
-        when(reminderService.getUserReminders(any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
+        when(reminderService.getReminders(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/reminders?page=0&size=10"))
                 .andExpect(status().isOk())

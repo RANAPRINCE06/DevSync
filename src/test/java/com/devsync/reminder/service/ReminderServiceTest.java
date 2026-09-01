@@ -1,13 +1,14 @@
-package com.devsync.notification.reminder.service;
+package com.devsync.reminder.service;
 
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
-import com.devsync.notification.reminder.dto.CreateReminderRequest;
-import com.devsync.notification.reminder.dto.ReminderResponse;
-import com.devsync.notification.reminder.dto.UpdateReminderRequest;
-import com.devsync.notification.reminder.entity.Reminder;
-import com.devsync.notification.reminder.entity.ReminderType;
-import com.devsync.notification.reminder.repository.ReminderRepository;
+import com.devsync.reminder.dto.CreateReminderRequest;
+import com.devsync.reminder.dto.ReminderResponse;
+import com.devsync.reminder.dto.UpdateReminderRequest;
+import com.devsync.reminder.entity.Reminder;
+import com.devsync.reminder.entity.ReminderStatus;
+import com.devsync.reminder.entity.ReminderType;
+import com.devsync.reminder.repository.ReminderRepository;
 import com.devsync.team.entity.Team;
 import com.devsync.team.entity.TeamMember;
 import com.devsync.team.entity.TeamRole;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -96,10 +98,13 @@ class ReminderServiceTest {
                 .user(sampleUser)
                 .team(sampleTeam)
                 .type(ReminderType.DAILY_PROGRESS)
+                .status(ReminderStatus.ACTIVE)
                 .title("Submit Daily Progress")
                 .message("Reminder at 6 PM")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .active(true)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -107,7 +112,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    @DisplayName("createReminder - success with team and active membership")
+    @DisplayName("createReminder - success with valid team and active membership")
     void createReminder_Success() {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
@@ -117,12 +122,13 @@ class ReminderServiceTest {
                 .message("Reminder at 6 PM")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
         when(teamRepository.findById(teamId)).thenReturn(Optional.of(sampleTeam));
         when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(sampleMember));
-        when(reminderRepository.existsByUserIdAndTypeAndTeamIdAndReminderTimeAndActiveTrue(eq(userId), eq(ReminderType.DAILY_PROGRESS), eq(teamId), eq(LocalTime.of(18, 0)))).thenReturn(false);
         when(reminderRepository.save(any(Reminder.class))).thenReturn(sampleReminder);
 
         ReminderResponse response = reminderService.createReminder(request);
@@ -130,6 +136,7 @@ class ReminderServiceTest {
         assertNotNull(response);
         assertEquals(reminderId, response.getId());
         assertEquals("Submit Daily Progress", response.getTitle());
+        assertEquals(ReminderStatus.ACTIVE, response.getStatus());
         assertTrue(response.isActive());
         verify(reminderRepository).save(any(Reminder.class));
     }
@@ -139,10 +146,13 @@ class ReminderServiceTest {
     void createReminder_UserNotFound_ThrowsException() {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
+                .teamId(teamId)
                 .type(ReminderType.DAILY_PROGRESS)
                 .title("Title")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
@@ -161,6 +171,8 @@ class ReminderServiceTest {
                 .title("Title")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
@@ -171,7 +183,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    @DisplayName("createReminder - user not active team member throws BadRequestException")
+    @DisplayName("createReminder - inactive membership throws BadRequestException")
     void createReminder_InactiveMembership_ThrowsException() {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
@@ -180,6 +192,8 @@ class ReminderServiceTest {
                 .title("Title")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
@@ -195,21 +209,26 @@ class ReminderServiceTest {
     void createReminder_InvalidTimezone_ThrowsException() {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
+                .teamId(teamId)
                 .type(ReminderType.DAILY_PROGRESS)
                 .title("Title")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Invalid/Timezone")
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
+        when(teamRepository.findById(teamId)).thenReturn(Optional.of(sampleTeam));
+        when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(sampleMember));
 
         assertThrows(BadRequestException.class, () -> reminderService.createReminder(request));
         verify(reminderRepository, never()).save(any(Reminder.class));
     }
 
     @Test
-    @DisplayName("createReminder - duplicate active reminder throws BadRequestException")
-    void createReminder_DuplicateActive_ThrowsException() {
+    @DisplayName("createReminder - invalid date range (startDate > endDate) throws BadRequestException")
+    void createReminder_InvalidDateRange_ThrowsException() {
         CreateReminderRequest request = CreateReminderRequest.builder()
                 .userId(userId)
                 .teamId(teamId)
@@ -217,15 +236,28 @@ class ReminderServiceTest {
                 .title("Title")
                 .reminderTime(LocalTime.of(18, 0))
                 .timezone("Asia/Kolkata")
+                .startDate(LocalDate.of(2026, 12, 31))
+                .endDate(LocalDate.of(2026, 9, 1))
                 .build();
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
         when(teamRepository.findById(teamId)).thenReturn(Optional.of(sampleTeam));
         when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(sampleMember));
-        when(reminderRepository.existsByUserIdAndTypeAndTeamIdAndReminderTimeAndActiveTrue(eq(userId), eq(ReminderType.DAILY_PROGRESS), eq(teamId), eq(LocalTime.of(18, 0)))).thenReturn(true);
 
         assertThrows(BadRequestException.class, () -> reminderService.createReminder(request));
         verify(reminderRepository, never()).save(any(Reminder.class));
+    }
+
+    @Test
+    @DisplayName("getReminderById - success")
+    void getReminderById_Success() {
+        when(reminderRepository.findById(reminderId)).thenReturn(Optional.of(sampleReminder));
+
+        ReminderResponse response = reminderService.getReminderById(reminderId);
+
+        assertNotNull(response);
+        assertEquals(reminderId, response.getId());
+        assertEquals("Submit Daily Progress", response.getTitle());
     }
 
     @Test
@@ -236,7 +268,9 @@ class ReminderServiceTest {
                 .message("Updated message")
                 .reminderTime(LocalTime.of(19, 0))
                 .timezone("Asia/Kolkata")
-                .active(true)
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 12, 31))
+                .status(ReminderStatus.ACTIVE)
                 .build();
 
         when(reminderRepository.findById(reminderId)).thenReturn(Optional.of(sampleReminder));
@@ -251,7 +285,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    @DisplayName("deactivateReminder - soft deletes reminder by setting active=false")
+    @DisplayName("deactivateReminder - soft deletes reminder by setting active=false and status=CANCELLED")
     void deactivateReminder_SoftDeletes() {
         when(reminderRepository.findById(reminderId)).thenReturn(Optional.of(sampleReminder));
         when(reminderRepository.save(any(Reminder.class))).thenReturn(sampleReminder);
@@ -259,19 +293,20 @@ class ReminderServiceTest {
         reminderService.deactivateReminder(reminderId);
 
         assertFalse(sampleReminder.isActive());
+        assertEquals(ReminderStatus.CANCELLED, sampleReminder.getStatus());
         verify(reminderRepository).save(sampleReminder);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    @DisplayName("getUserReminders - paginated list filtering")
-    void getUserReminders_Success() {
+    @DisplayName("getReminders - paginated list filtering")
+    void getReminders_Success() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Reminder> page = new PageImpl<>(List.of(sampleReminder));
 
         when(reminderRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-        Page<ReminderResponse> result = reminderService.getUserReminders(userId, teamId, ReminderType.DAILY_PROGRESS, true, pageable);
+        Page<ReminderResponse> result = reminderService.getReminders(userId, teamId, ReminderType.DAILY_PROGRESS, ReminderStatus.ACTIVE, true, null, null, pageable);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());

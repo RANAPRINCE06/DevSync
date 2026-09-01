@@ -1,11 +1,12 @@
-package com.devsync.notification.reminder.dto;
+package com.devsync.reminder.dto;
 
-import com.devsync.notification.reminder.entity.ReminderType;
+import com.devsync.reminder.entity.ReminderType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ public class CreateReminderRequest {
     @Schema(example = "123e4567-e89b-12d3-a456-426614174000")
     private UUID userId;
 
+    @NotNull(message = "Team ID is required")
     @Schema(example = "987e6543-e21b-12d3-a456-426614174000")
     private UUID teamId;
 
@@ -28,7 +30,7 @@ public class CreateReminderRequest {
     private String title;
 
     @Size(max = 2000, message = "Message must not exceed 2000 characters")
-    @Schema(example = "Submit your daily progress and goals update")
+    @Schema(example = "Submit your daily progress and goal update before 9 PM")
     private String message;
 
     @NotNull(message = "Reminder time is required")
@@ -39,10 +41,18 @@ public class CreateReminderRequest {
     @Schema(example = "Asia/Kolkata")
     private String timezone;
 
+    @NotNull(message = "Start date is required")
+    @Schema(example = "2026-09-01")
+    private LocalDate startDate;
+
+    @NotNull(message = "End date is required")
+    @Schema(example = "2026-12-31")
+    private LocalDate endDate;
+
     public CreateReminderRequest() {
     }
 
-    public CreateReminderRequest(UUID userId, UUID teamId, ReminderType type, String title, String message, LocalTime reminderTime, String timezone) {
+    public CreateReminderRequest(UUID userId, UUID teamId, ReminderType type, String title, String message, LocalTime reminderTime, String timezone, LocalDate startDate, LocalDate endDate) {
         this.userId = userId;
         this.teamId = teamId;
         this.type = type;
@@ -50,6 +60,8 @@ public class CreateReminderRequest {
         this.message = message;
         this.reminderTime = reminderTime;
         this.timezone = timezone;
+        this.startDate = startDate;
+        this.endDate = endDate;
     }
 
     public UUID getUserId() {
@@ -108,6 +120,22 @@ public class CreateReminderRequest {
         this.timezone = timezone;
     }
 
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
     public static CreateReminderRequestBuilder builder() {
         return new CreateReminderRequestBuilder();
     }
@@ -120,6 +148,8 @@ public class CreateReminderRequest {
         private String message;
         private LocalTime reminderTime;
         private String timezone;
+        private LocalDate startDate;
+        private LocalDate endDate;
 
         public CreateReminderRequestBuilder userId(UUID userId) {
             this.userId = userId;
@@ -156,8 +186,18 @@ public class CreateReminderRequest {
             return this;
         }
 
+        public CreateReminderRequestBuilder startDate(LocalDate startDate) {
+            this.startDate = startDate;
+            return this;
+        }
+
+        public CreateReminderRequestBuilder endDate(LocalDate endDate) {
+            this.endDate = endDate;
+            return this;
+        }
+
         public CreateReminderRequest build() {
-            return new CreateReminderRequest(userId, teamId, type, title, message, reminderTime, timezone);
+            return new CreateReminderRequest(userId, teamId, type, title, message, reminderTime, timezone, startDate, endDate);
         }
     }
 }

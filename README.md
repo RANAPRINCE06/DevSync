@@ -40,12 +40,12 @@ DevSync is a private developer accountability and growth platform designed to em
 - **Dynamic Paginated Filtering**: Spring Data JPA Specifications (`GoalSpecification`, `TaskSpecification`) with Pageable sorting defaults.
 
 ### Step 2D — Notification & Reminder Domain
-- **Notification Domain**: `Notification` entity mapping `notifications` table with `NotificationType` (`DAILY_REMINDER`, `GOAL_DEADLINE`, `TASK_DEADLINE`, `PROGRESS_REMINDER`, `ACHIEVEMENT`, `SYSTEM`), `NotificationChannel` (`IN_APP`), and `NotificationStatus` (`PENDING`, `SENT`, `READ`, `FAILED`).
-- **Notification Business Rules**: Idempotent `markAsRead`, batch `markAllAsRead`, unread count aggregation, soft deletion (`deleted = true`), and paginated dynamic filtering.
-- **Reminder Domain**: `Reminder` entity mapping `reminders` table with `ReminderType` (`DAILY_PROGRESS`, `GOAL_DEADLINE`, `TASK_DEADLINE`).
-- **Reminder Business Rules**: User existence check, active team membership validation when `teamId` is provided, IANA timezone validation via `ZoneId.of()`, duplicate active reminder prevention (`user + type + team + reminderTime`), and soft deletion (`active = false`).
-- **Database Migrations**: Flyway migrations `V6__create_notifications_schema.sql` and `V7__create_reminders_schema.sql` with performance indexes.
-- **Extensible Architecture**: Core notification/reminder domain foundation is prepared for future scheduled background job runners and external delivery providers (Email, Push, SMS) without requiring schema or domain rewrites.
+- **Notification Domain (`com.devsync.notification`)**: `Notification` entity mapping `notifications` table with `NotificationType` (`DAILY_REMINDER`, `GOAL_REMINDER`, `TASK_REMINDER`, `SYSTEM`, `ACHIEVEMENT`) and `NotificationStatus` (`UNREAD`, `READ`).
+- **Notification Business Rules**: Validates user existence, starts as `UNREAD`, records `readAt` upon transition to `READ` (idempotent), batch `markAllAsRead`, count unread notifications, and paginated dynamic filtering.
+- **Reminder Domain (`com.devsync.reminder`)**: `Reminder` entity mapping `reminders` table with `ReminderType` (`DAILY_PROGRESS`, `GOAL`, `TASK`) and `ReminderStatus` (`ACTIVE`, `PAUSED`, `COMPLETED`, `CANCELLED`).
+- **Reminder Business Rules**: Validates user existence, validates team existence and active membership in that team, validates IANA timezone (`ZoneId.of()`), validates date range (`startDate <= endDate`), starts as `ACTIVE` and `active = true`, immutable ownership fields, and soft deletion (`active = false`, `status = CANCELLED`).
+- **Database Migrations**: Flyway migrations `V6__create_notifications_schema.sql` and `V7__create_reminders_schema.sql` with table constraints and performance indexes.
+- **Extensible Architecture**: Foundation prepared for future scheduler integration (Spring `@Scheduled` / Quartz) and external delivery channels (Email, Push, SMS) without modifying core domain models.
 
 ---
 
@@ -89,17 +89,18 @@ DevSync is a private developer accountability and growth platform designed to em
 - `POST /api/v1/notifications` — Create an in-app notification
 - `GET /api/v1/notifications/{id}` — Get notification details by UUID
 - `GET /api/v1/notifications` — Paginated & filtered list (`userId`, `type`, `status`, `page`, `size`, `sort`)
+- `GET /api/v1/notifications/unread` — Paginated list of unread notifications
+- `GET /api/v1/notifications/unread/count` — Get total unread count for a user
 - `PATCH /api/v1/notifications/{id}/read` — Mark a notification as read (idempotent)
 - `PATCH /api/v1/notifications/read-all` — Mark all unread notifications for a user as read
-- `GET /api/v1/notifications/unread-count` — Get total unread count for a user
-- `DELETE /api/v1/notifications/{id}` — Soft delete notification (`deleted = true`)
+- `DELETE /api/v1/notifications/{id}` — Delete notification by UUID
 
 ### Reminder APIs (`/api/v1/reminders`)
 - `POST /api/v1/reminders` — Configure a scheduled reminder
 - `GET /api/v1/reminders/{id}` — Get reminder details by UUID
-- `PUT /api/v1/reminders/{id}` — Update reminder title, message, time, timezone, or active state
-- `DELETE /api/v1/reminders/{id}` — Soft delete (deactivate) reminder (`active = false`)
-- `GET /api/v1/reminders` — Paginated & filtered list (`userId`, `teamId`, `type`, `active`, `page`, `size`, `sort`)
+- `PUT /api/v1/reminders/{id}` — Update reminder title, message, time, timezone, dates, or status
+- `DELETE /api/v1/reminders/{id}` — Soft delete (deactivate) reminder (`active = false`, `status = CANCELLED`)
+- `GET /api/v1/reminders` — Paginated & filtered list (`userId`, `teamId`, `type`, `status`, `active`, `startDate`, `endDate`, `page`, `size`, `sort`)
 
 ---
 

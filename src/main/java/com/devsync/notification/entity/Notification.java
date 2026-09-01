@@ -24,11 +24,7 @@ public class Notification {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private NotificationChannel channel;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private NotificationStatus status;
+    private NotificationStatus status = NotificationStatus.UNREAD;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -42,61 +38,36 @@ public class Notification {
     @Column(name = "reference_type", length = 50)
     private String referenceType;
 
-    @Column(name = "scheduled_at")
-    private Instant scheduledAt;
-
-    @Column(name = "sent_at")
-    private Instant sentAt;
-
     @Column(name = "read_at")
     private Instant readAt;
-
-    @Column(nullable = false)
-    private boolean deleted = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
     public Notification() {
     }
 
-    public Notification(UUID id, User user, NotificationType type, NotificationChannel channel, NotificationStatus status, String title, String message, UUID referenceId, String referenceType, Instant scheduledAt, Instant sentAt, Instant readAt, boolean deleted, Instant createdAt, Instant updatedAt) {
+    public Notification(UUID id, User user, NotificationType type, NotificationStatus status, String title, String message, UUID referenceId, String referenceType, Instant readAt, Instant createdAt) {
         this.id = id;
         this.user = user;
         this.type = type;
-        this.channel = channel != null ? channel : NotificationChannel.IN_APP;
-        this.status = status != null ? status : NotificationStatus.PENDING;
+        this.status = status != null ? status : NotificationStatus.UNREAD;
         this.title = title;
         this.message = message;
         this.referenceId = referenceId;
         this.referenceType = referenceType;
-        this.scheduledAt = scheduledAt;
-        this.sentAt = sentAt;
         this.readAt = readAt;
-        this.deleted = deleted;
         this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
     }
 
     @PrePersist
     protected void onCreate() {
-        Instant now = Instant.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.channel == null) {
-            this.channel = NotificationChannel.IN_APP;
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
         }
         if (this.status == null) {
-            this.status = NotificationStatus.PENDING;
+            this.status = NotificationStatus.UNREAD;
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = Instant.now();
     }
 
     public UUID getId() {
@@ -121,14 +92,6 @@ public class Notification {
 
     public void setType(NotificationType type) {
         this.type = type;
-    }
-
-    public NotificationChannel getChannel() {
-        return channel;
-    }
-
-    public void setChannel(NotificationChannel channel) {
-        this.channel = channel;
     }
 
     public NotificationStatus getStatus() {
@@ -171,36 +134,12 @@ public class Notification {
         this.referenceType = referenceType;
     }
 
-    public Instant getScheduledAt() {
-        return scheduledAt;
-    }
-
-    public void setScheduledAt(Instant scheduledAt) {
-        this.scheduledAt = scheduledAt;
-    }
-
-    public Instant getSentAt() {
-        return sentAt;
-    }
-
-    public void setSentAt(Instant sentAt) {
-        this.sentAt = sentAt;
-    }
-
     public Instant getReadAt() {
         return readAt;
     }
 
     public void setReadAt(Instant readAt) {
         this.readAt = readAt;
-    }
-
-    public boolean isDeleted() {
-        return deleted;
-    }
-
-    public void setDeleted(boolean deleted) {
-        this.deleted = deleted;
     }
 
     public Instant getCreatedAt() {
@@ -211,14 +150,6 @@ public class Notification {
         this.createdAt = createdAt;
     }
 
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
     public static NotificationBuilder builder() {
         return new NotificationBuilder();
     }
@@ -227,18 +158,13 @@ public class Notification {
         private UUID id;
         private User user;
         private NotificationType type;
-        private NotificationChannel channel = NotificationChannel.IN_APP;
-        private NotificationStatus status = NotificationStatus.PENDING;
+        private NotificationStatus status = NotificationStatus.UNREAD;
         private String title;
         private String message;
         private UUID referenceId;
         private String referenceType;
-        private Instant scheduledAt;
-        private Instant sentAt;
         private Instant readAt;
-        private boolean deleted = false;
         private Instant createdAt;
-        private Instant updatedAt;
 
         public NotificationBuilder id(UUID id) {
             this.id = id;
@@ -252,11 +178,6 @@ public class Notification {
 
         public NotificationBuilder type(NotificationType type) {
             this.type = type;
-            return this;
-        }
-
-        public NotificationBuilder channel(NotificationChannel channel) {
-            this.channel = channel;
             return this;
         }
 
@@ -285,23 +206,8 @@ public class Notification {
             return this;
         }
 
-        public NotificationBuilder scheduledAt(Instant scheduledAt) {
-            this.scheduledAt = scheduledAt;
-            return this;
-        }
-
-        public NotificationBuilder sentAt(Instant sentAt) {
-            this.sentAt = sentAt;
-            return this;
-        }
-
         public NotificationBuilder readAt(Instant readAt) {
             this.readAt = readAt;
-            return this;
-        }
-
-        public NotificationBuilder deleted(boolean deleted) {
-            this.deleted = deleted;
             return this;
         }
 
@@ -310,13 +216,8 @@ public class Notification {
             return this;
         }
 
-        public NotificationBuilder updatedAt(Instant updatedAt) {
-            this.updatedAt = updatedAt;
-            return this;
-        }
-
         public Notification build() {
-            return new Notification(id, user, type, channel, status, title, message, referenceId, referenceType, scheduledAt, sentAt, readAt, deleted, createdAt, updatedAt);
+            return new Notification(id, user, type, status, title, message, referenceId, referenceType, readAt, createdAt);
         }
     }
 }

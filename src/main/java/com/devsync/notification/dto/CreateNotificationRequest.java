@@ -1,13 +1,11 @@
 package com.devsync.notification.dto;
 
-import com.devsync.notification.entity.NotificationChannel;
 import com.devsync.notification.entity.NotificationType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import java.time.Instant;
 import java.util.UUID;
 
 public class CreateNotificationRequest {
@@ -19,9 +17,6 @@ public class CreateNotificationRequest {
     @NotNull(message = "Notification type is required")
     @Schema(example = "DAILY_REMINDER")
     private NotificationType type;
-
-    @Schema(example = "IN_APP")
-    private NotificationChannel channel;
 
     @NotBlank(message = "Title is required")
     @Size(max = 200, message = "Title must not exceed 200 characters")
@@ -39,20 +34,16 @@ public class CreateNotificationRequest {
     @Schema(example = "GOAL")
     private String referenceType;
 
-    private Instant scheduledAt;
-
     public CreateNotificationRequest() {
     }
 
-    public CreateNotificationRequest(UUID userId, NotificationType type, NotificationChannel channel, String title, String message, UUID referenceId, String referenceType, Instant scheduledAt) {
+    public CreateNotificationRequest(UUID userId, NotificationType type, String title, String message, UUID referenceId, String referenceType) {
         this.userId = userId;
         this.type = type;
-        this.channel = channel;
         this.title = title;
         this.message = message;
         this.referenceId = referenceId;
         this.referenceType = referenceType;
-        this.scheduledAt = scheduledAt;
     }
 
     public UUID getUserId() {
@@ -69,14 +60,6 @@ public class CreateNotificationRequest {
 
     public void setType(NotificationType type) {
         this.type = type;
-    }
-
-    public NotificationChannel getChannel() {
-        return channel;
-    }
-
-    public void setChannel(NotificationChannel channel) {
-        this.channel = channel;
     }
 
     public String getTitle() {
@@ -111,14 +94,6 @@ public class CreateNotificationRequest {
         this.referenceType = referenceType;
     }
 
-    public Instant getScheduledAt() {
-        return scheduledAt;
-    }
-
-    public void setScheduledAt(Instant scheduledAt) {
-        this.scheduledAt = scheduledAt;
-    }
-
     public static CreateNotificationRequestBuilder builder() {
         return new CreateNotificationRequestBuilder();
     }
@@ -126,12 +101,10 @@ public class CreateNotificationRequest {
     public static class CreateNotificationRequestBuilder {
         private UUID userId;
         private NotificationType type;
-        private NotificationChannel channel = NotificationChannel.IN_APP;
         private String title;
         private String message;
         private UUID referenceId;
         private String referenceType;
-        private Instant scheduledAt;
 
         public CreateNotificationRequestBuilder userId(UUID userId) {
             this.userId = userId;
@@ -140,11 +113,6 @@ public class CreateNotificationRequest {
 
         public CreateNotificationRequestBuilder type(NotificationType type) {
             this.type = type;
-            return this;
-        }
-
-        public CreateNotificationRequestBuilder channel(NotificationChannel channel) {
-            this.channel = channel;
             return this;
         }
 
@@ -168,13 +136,8 @@ public class CreateNotificationRequest {
             return this;
         }
 
-        public CreateNotificationRequestBuilder scheduledAt(Instant scheduledAt) {
-            this.scheduledAt = scheduledAt;
-            return this;
-        }
-
         public CreateNotificationRequest build() {
-            return new CreateNotificationRequest(userId, type, channel, title, message, referenceId, referenceType, scheduledAt);
+            return new CreateNotificationRequest(userId, type, title, message, referenceId, referenceType);
         }
     }
 }
