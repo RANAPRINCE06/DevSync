@@ -45,7 +45,23 @@ DevSync is a private developer accountability and growth platform designed to em
 - **Reminder Domain (`com.devsync.reminder`)**: `Reminder` entity mapping `reminders` table with `ReminderType` (`DAILY_PROGRESS`, `GOAL`, `TASK`) and `ReminderStatus` (`ACTIVE`, `PAUSED`, `COMPLETED`, `CANCELLED`).
 - **Reminder Business Rules**: Validates user existence, validates team existence and active membership in that team, validates IANA timezone (`ZoneId.of()`), validates date range (`startDate <= endDate`), starts as `ACTIVE` and `active = true`, immutable ownership fields, and soft deletion (`active = false`, `status = CANCELLED`).
 - **Database Migrations**: Flyway migrations `V6__create_notifications_schema.sql` and `V7__create_reminders_schema.sql` with table constraints and performance indexes.
-- **Extensible Architecture**: Foundation prepared for future scheduler integration (Spring `@Scheduled` / Quartz) and external delivery channels (Email, Push, SMS) without modifying core domain models.
+
+### Step 2E — Achievement, Leaderboard & Coding Profile Domain
+- **Coding Profile Domain (`com.devsync.codingprofile`)**: `CodingProfile` entity mapping `coding_profiles` table with `CodingPlatform` enum (`LEETCODE`, `CODEFORCES`, `CODECHEF`, `HACKERRANK`, `GITHUB`, `OTHER`). Supports rating, problems solved, contests participated, rank, URL validation, duplicate active profile prevention per user/platform, and soft deletion (`active = false`).
+- **Achievement Domain (`com.devsync.achievement`)**: `Achievement` entity mapping `achievements` table with `AchievementType` enum (`STREAK`, `DSA`, `GOAL`, `TASK`, `CODING_PLATFORM`, `TEAM`, `SPECIAL`). Supports point tracking, dynamic filtering, point aggregation, and soft deletion (`active = false`).
+- **Team Leaderboard Domain (`com.devsync.leaderboard`)**: Real-time deterministic score and ranking computation for active team members.
+  - **Deterministic Scoring Rules**:
+    - Daily Progress Entry: `+10` points
+    - Completed Task: `+20` points
+    - Completed Goal: `+50` points
+    - Achievement Points: `+` actual active achievement points
+  - **Deterministic Tie-Breaker Ordering**:
+    1. `score` DESC
+    2. `completedTasks` DESC
+    3. `progressEntries` DESC
+    4. `userName` ASC
+  - **Periods**: `DAILY` (today), `WEEKLY` (Monday to now), `MONTHLY` (1st of month to now), `ALL_TIME` (all records).
+- **Database Migrations**: Flyway migrations `V8__create_coding_profiles_schema.sql` and `V9__create_achievements_schema.sql` with check constraints and performance indexes.
 
 ---
 
@@ -101,6 +117,28 @@ DevSync is a private developer accountability and growth platform designed to em
 - `PUT /api/v1/reminders/{id}` — Update reminder title, message, time, timezone, dates, or status
 - `DELETE /api/v1/reminders/{id}` — Soft delete (deactivate) reminder (`active = false`, `status = CANCELLED`)
 - `GET /api/v1/reminders` — Paginated & filtered list (`userId`, `teamId`, `type`, `status`, `active`, `startDate`, `endDate`, `page`, `size`, `sort`)
+
+### Coding Profile APIs (`/api/v1/coding-profiles`)
+- `POST /api/v1/coding-profiles` — Link a coding profile
+- `GET /api/v1/coding-profiles/{id}` — Get coding profile details by UUID
+- `PUT /api/v1/coding-profiles/{id}` — Update coding profile stats or active state
+- `DELETE /api/v1/coding-profiles/{id}` — Soft delete coding profile (`active = false`)
+- `GET /api/v1/coding-profiles` — Paginated & filtered list (`userId`, `platform`, `active`, `page`, `size`, `sort`)
+- `GET /api/v1/coding-profiles/user/{userId}` — Get all coding profiles for a user
+
+### Achievement APIs (`/api/v1/achievements`)
+- `POST /api/v1/achievements` — Award/create an achievement
+- `GET /api/v1/achievements/{id}` — Get achievement details by UUID
+- `PUT /api/v1/achievements/{id}` — Update achievement title, points, icon, or status
+- `DELETE /api/v1/achievements/{id}` — Soft delete achievement (`active = false`)
+- `GET /api/v1/achievements` — Paginated & filtered list (`userId`, `type`, `active`, `earnedFrom`, `earnedTo`, `page`, `size`, `sort`)
+- `GET /api/v1/achievements/user/{userId}` — Get all achievements for a user
+- `GET /api/v1/achievements/user/{userId}/points` — Get aggregate active achievement points for a user
+
+### Leaderboard APIs (`/api/v1/leaderboard`)
+- `GET /api/v1/leaderboard/teams/{teamId}` — Get ranked leaderboard for a team (`period=DAILY|WEEKLY|MONTHLY|ALL_TIME`, `page`, `size`, `sort`)
+- `GET /api/v1/leaderboard/teams/{teamId}/me/{userId}` — Get specific member ranking and score breakdown in a team
+- `GET /api/v1/leaderboard/teams/{teamId}/period/{period}` — Get leaderboard for explicit period
 
 ---
 
