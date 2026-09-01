@@ -14,28 +14,29 @@ DevSync is a private developer accountability and growth platform designed to em
 - **Monitoring**: Spring Boot Actuator (`/actuator/health`)
 
 ### Frontend
-- **Framework**: React 18 with TypeScript & Vite
-- **Styling**: Tailwind CSS (Dark theme first, custom palette, slate/violet accents)
-- **Routing**: React Router v7
+- **Framework**: React 18 with TypeScript & Vite 6
+- **Styling**: Tailwind CSS (Dark / Light / System theme modes, custom slate & violet accents)
+- **Routing & Guards**: React Router v7 with `ProtectedRoute` and `PublicRoute` session protection
+- **Authentication & State**: Centralized `AuthContext` with session token persistence, Axios interceptors, and `AppContext` synchronization
 - **Server State**: TanStack Query (React Query v5) with optimistic updates and caching
-- **HTTP Client**: Centralized Axios client with standard error interceptors
+- **HTTP Client**: Centralized Axios client with automatic Bearer token injection and global 401 redirect handling
 - **Icons**: Lucide React
 
 ---
 
-## Implemented Modules
+## Implemented Modules & Milestones
 
 ### Step 1 — Project Foundation
 - Spring Boot 3.4.3 + Java 21 foundation, PostgreSQL database with Hikari pool, Flyway migrations (`V1__init_schema.sql`), Actuator, Swagger/OpenAPI.
 
 ### Step 2A — Identity & Team Management
-- `User`, `Team`, and `TeamMember` domains with UUID primary keys, IANA timezone validation, and role authorization (`OWNER`, `ADMIN`, `MEMBER`). Flyway `V2__create_user_team_schema.sql`.
+- `User`, `Team`, and `TeamMember` domains with UUID primary keys, IANA timezone validation, and role authorization (`OWNER`, `ADMIN`, `MEMBER`). Flyway `V2`.
 
 ### Step 2B — Daily Progress & Accountability
-- `DailyProgress` entity mapping daily learning and task progress with unique `(user_id, team_id, progress_date)` constraints. Flyway `V3__create_daily_progress_schema.sql`.
+- `DailyProgress` entity mapping daily learning and task progress with unique `(user_id, team_id, progress_date)` constraints. Flyway `V3`.
 
 ### Step 2C — Goals & Task Management
-- `Goal` and `Task` domains with status/priority enums, automatic goal completion, and team relationship derivations. Flyway `V4__create_goals_schema.sql` and `V5__create_tasks_schema.sql`.
+- `Goal` and `Task` domains with status/priority enums, automatic goal completion at 100%, and team relationship derivations. Flyway `V4` and `V5`.
 
 ### Step 2D — Notification & Reminder Domain
 - In-app `Notification` domain with read/unread tracking and batch mark-as-read.
@@ -47,11 +48,19 @@ DevSync is a private developer accountability and growth platform designed to em
 - Real-time `Leaderboard` calculation for `DAILY`, `WEEKLY`, `MONTHLY`, and `ALL_TIME` periods. Flyway `V8` and `V9`.
 
 ### Step 3A — Frontend Foundation
-- **Application Shell**: Modern developer-focused layout with collapsible sidebar, mobile drawer, navbar with workspace/team switcher, user switcher, and notification badges.
-- **Developer Dashboard (`/dashboard`)**: Focus time metrics, active goals summary, upcoming tasks with status badges, team leaderboard top 3 preview, recent badges, and quick-add progress modal.
-- **Typed API Clients & Hooks**: End-to-end typed Axios modules and React Query hooks for all 10 backend domains.
-- **Design System & UI Library**: Custom reusable `Button`, `Card`, `Badge`, `Modal`, `Input`, `Select`, `Skeleton`, `EmptyState`, `Toast`, `Tabs`, and `Pagination` components.
-- **Route Shells**: Foundation routes for `/dashboard`, `/progress`, `/goals`, `/tasks`, `/team`, `/leaderboard`, `/achievements`, `/coding-profiles`, `/notifications`, and `/settings`.
+- Modern application shell with collapsible sidebar, mobile drawer, navbar, and foundational typed API client layer.
+
+### Step 3B — Functional Productivity Modules & Complete UI/UX
+- Complete interactive pages for `/dashboard`, `/progress`, `/goals`, `/tasks` (Kanban & List views), `/team`, `/leaderboard`, `/achievements`, `/coding-profiles`, `/notifications`, and `/settings`.
+
+### Step 3C — Authentication, User Session & Production UX
+- **Authentication Flow**: Login (`/login`), Registration with password strength meter (`/register`), and Password Recovery (`/forgot-password`).
+- **Route Protection**: `ProtectedRoute` wrapper guarding all productivity pages with session resolution spinners and redirect preservation.
+- **Session Management**: Persistent authentication token and user context in `localStorage` / `sessionStorage` with automatic Axios Bearer token attachment and global 401 handling.
+- **Theme System**: Dark, Light, and System theme synchronization with local storage persistence.
+- **Command Palette (`Ctrl+K` / `Cmd+K`)**: Keyboard arrow navigation, enter selection, quick actions (Create Goal, Create Task, Log Progress, Link Profile), and universal search.
+- **Navbar Popover**: Live notification bell popover with recent unread alerts and one-click mark all as read.
+- **Settings Center**: Profile updater, password change form, theme preferences, and danger zone account deactivation.
 
 ---
 

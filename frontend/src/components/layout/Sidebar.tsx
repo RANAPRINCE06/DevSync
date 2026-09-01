@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -15,9 +15,11 @@ import {
   ChevronRight,
   CodeXml,
   X,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/contexts/ToastContext';
 import { useUnreadCount } from '@/hooks/useNotifications';
 
 interface SidebarProps {
@@ -33,9 +35,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   setIsMobileOpen,
 }) => {
-  const { activeUser } = useApp();
-  const { data: unreadData } = useUnreadCount(activeUser?.id);
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { showToast } = useToast();
+  const { data: unreadData } = useUnreadCount(user?.id);
   const unreadCount = unreadData?.unreadCount || 0;
+
+  const handleLogout = async () => {
+    await logout();
+    showToast('info', 'Logged out successfully');
+    navigate('/login', { replace: true });
+  };
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -147,17 +157,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* User Card */}
-        {activeUser && (
-          <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary-950 border border-primary-800 flex items-center justify-center text-primary-300 text-xs font-bold shrink-0">
-              {activeUser.name.charAt(0).toUpperCase()}
-            </div>
-            {(!isCollapsed || isMobileOpen) && (
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-slate-200 truncate">{activeUser.name}</p>
-                <p className="text-[10px] text-slate-400 truncate">{activeUser.email}</p>
+        {/* User Card & Logout */}
+        {user && (
+          <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {user.name.charAt(0).toUpperCase()}
               </div>
+              {(!isCollapsed || isMobileOpen) && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-slate-200 truncate">{user.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                </div>
+              )}
+            </div>
+
+            {(!isCollapsed || isMobileOpen) && (
+              <button
+                onClick={handleLogout}
+                className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/20 transition-colors"
+                title="Log out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         )}
