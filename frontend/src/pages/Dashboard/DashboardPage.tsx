@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   Sliders,
   Edit2,
+  TrendingUp,
+  Zap,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -62,9 +64,9 @@ export const DashboardPage: React.FC = () => {
   });
   const todayProgress = progressPage?.content?.[0];
 
-  // Fetch 7 days progress for weekly focus chart
+  // 14 days progress for weekly focus chart & trends comparison
   const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - 6);
+  weekStart.setDate(weekStart.getDate() - 13);
   const weekStartStr = weekStart.toISOString().split('T')[0];
 
   const { data: weekProgressData } = useProgressList({
@@ -72,19 +74,19 @@ export const DashboardPage: React.FC = () => {
     teamId: activeTeam?.id,
     fromDate: weekStartStr,
     toDate: todayStr,
-    size: 20,
+    size: 50,
   });
 
   const { data: goalsPage, isLoading: isGoalsLoading } = useGoals({
     teamId: activeTeam?.id,
     active: true,
-    size: 4,
+    size: 6,
   });
 
   const { data: tasksPage, isLoading: isTasksLoading } = useTasks({
     teamId: activeTeam?.id,
     active: true,
-    size: 5,
+    size: 15,
   });
 
   const { data: leaderboardPage, isLoading: isLeaderboardLoading } = useLeaderboard(
@@ -159,7 +161,7 @@ export const DashboardPage: React.FC = () => {
           studyMinutes: Number(studyMinutes) || 0,
           status,
         });
-        showToast('success', 'Daily progress logged successfully!');
+        showToast('success', 'Daily progress logged successfully! (+10 pts)');
       }
 
       setIsAddProgressOpen(false);
@@ -185,7 +187,7 @@ export const DashboardPage: React.FC = () => {
           active: true,
         },
       });
-      showToast('success', isCompleted ? 'Task marked as Todo' : 'Task marked as Completed (+20 score)');
+      showToast('success', isCompleted ? 'Task marked as Todo' : 'Task marked as Completed (+20 pts)');
     } catch (err: unknown) {
       showToast('error', 'Failed to update task', err instanceof Error ? err.message : 'Unknown error');
     }
@@ -234,13 +236,18 @@ export const DashboardPage: React.FC = () => {
   }).format(new Date());
 
   // Task Stats Calculation
-  const totalTasks = tasksPage?.content?.length || 0;
-  const completedTasksCount = tasksPage?.content?.filter((t) => t.status === 'COMPLETED').length || 0;
-  const inProgressTasksCount = tasksPage?.content?.filter((t) => t.status === 'IN_PROGRESS').length || 0;
-  const pendingTasksCount = tasksPage?.content?.filter((t) => t.status === 'TODO').length || 0;
+  const allTasks = tasksPage?.content || [];
+  const totalTasks = allTasks.length;
+  const completedTasksCount = allTasks.filter((t) => t.status === 'COMPLETED').length;
+  const inProgressTasksCount = allTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const pendingTasksCount = allTasks.filter((t) => t.status === 'TODO').length;
+  const overdueTasksCount = allTasks.filter((t) => {
+    if (!t.dueDate || t.status === 'COMPLETED') return false;
+    return new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
+  }).length;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0;
 
-  // 7-day focus chart data builder
+  // 7-day focus chart builder
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -252,11 +259,32 @@ export const DashboardPage: React.FC = () => {
     const isToday = dateStr === todayStr;
     return { dateStr, dayLabel, minutes, isToday };
   });
+
+  const currentWeekTotalMinutes = last7Days.reduce((acc, curr) => acc + curr.minutes, 0);
   const maxFocusMinutes = Math.max(...last7Days.map((d) => d.minutes), 120);
+
+  // Calculate highest productivity day
+  const bestDay = [...last7Days].sort((a, b) => b.minutes - a.minutes)[0];
+
+  // Goals health check helper
+  const getGoalHealth = (goal: Goal) => {
+    if (goal.status === 'COMPLETED' || goal.progress >= 100) {
+      return { label: 'Completed', variant: 'success' as const };
+    }
+    const diff = new Date(goal.targetDate).getTime() - new Date().getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days < 0) {
+      return { label: 'Overdue', variant: 'danger' as const };
+    }
+    if (days <= 3 && goal.progress < 50) {
+      return { label: 'At Risk', variant: 'warning' as const };
+    }
+    return { label: 'On Track', variant: 'primary' as const };
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      {/* 1. Header Banner */}
+      {/* 1. Header Banner & Quick Action */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-850">
         <div>
           <h1 className="text-2xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
@@ -289,7 +317,7 @@ export const DashboardPage: React.FC = () => {
 
       {/* 2. Key Metrics Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Study Minutes */}
+        {/* Today's Focus */}
         <Card hoverable className="relative overflow-hidden group">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">Today's Focus</span>
@@ -301,8 +329,9 @@ export const DashboardPage: React.FC = () => {
             <div className="text-2xl font-bold text-slate-100">
               {todayProgress ? formatMinutes(todayProgress.studyMinutes) : '0m'}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {todayProgress ? 'Logged for today' : 'No study logged yet'}
+            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-primary-400" />
+              {formatMinutes(currentWeekTotalMinutes)} this week
             </p>
           </div>
         </Card>
@@ -319,14 +348,14 @@ export const DashboardPage: React.FC = () => {
             <div className="text-2xl font-bold text-slate-100">
               {isGoalsLoading ? <Skeleton className="h-8 w-12" /> : goalsPage?.totalElements || 0}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">In progress & target goals</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">In progress & target milestones</p>
           </div>
         </Card>
 
-        {/* Pending Tasks */}
+        {/* Pending & Overdue Tasks */}
         <Card hoverable className="relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Pending Tasks</span>
+            <span className="text-xs font-medium text-slate-400">Tasks in Pipeline</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
               <CheckSquare className="w-4 h-4" />
             </div>
@@ -335,7 +364,13 @@ export const DashboardPage: React.FC = () => {
             <div className="text-2xl font-bold text-slate-100">
               {isTasksLoading ? <Skeleton className="h-8 w-12" /> : pendingTasksCount + inProgressTasksCount}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Tasks due soon</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {overdueTasksCount > 0 ? (
+                <span className="text-rose-400 font-medium">⚠️ {overdueTasksCount} overdue</span>
+              ) : (
+                `${completedTasksCount} completed recently`
+              )}
+            </p>
           </div>
         </Card>
 
@@ -351,14 +386,36 @@ export const DashboardPage: React.FC = () => {
             <div className="text-2xl font-bold text-slate-100">
               {totalPointsData?.totalPoints || 0} <span className="text-xs font-normal text-amber-400">pts</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">Earned from milestones</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Applied to team leaderboard</p>
           </div>
         </Card>
       </div>
 
-      {/* 3. Productivity Analytics Section (7-Day Focus & Task Completion) */}
+      {/* 3. Productivity Insights Banner */}
+      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-primary-950/40 via-slate-900/60 to-indigo-950/30 border border-primary-800/40 flex items-center justify-between gap-4 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-primary-900/60 border border-primary-700/60 flex items-center justify-center text-primary-300 shrink-0">
+            <Zap className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <span className="font-bold text-slate-100 block">Productivity Insight</span>
+            <span className="text-slate-400">
+              {bestDay && bestDay.minutes > 0
+                ? `Your highest focus day this week was ${bestDay.dayLabel} with ${formatMinutes(bestDay.minutes)} logged.`
+                : 'Log daily focus sessions to build consistency and unlock team leaderboard boosts.'}
+            </span>
+          </div>
+        </div>
+        <Link to="/progress">
+          <Button variant="ghost" size="sm" rightIcon={<ArrowUpRight className="w-3.5 h-3.5" />}>
+            View Log
+          </Button>
+        </Link>
+      </div>
+
+      {/* 4. Analytics Section (7-Day Focus & Task Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: 7-Day Focus Bar Chart (2 columns) */}
+        {/* Left: 7-Day Focus Bar Chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between w-full">
@@ -402,7 +459,7 @@ export const DashboardPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Right: Task Completion Overview (1 column) */}
+        {/* Right: Task Completion Overview */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -413,7 +470,7 @@ export const DashboardPage: React.FC = () => {
           <CardContent>
             <div className="space-y-4 pt-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">Total Completion</span>
+                <span className="text-xs text-slate-400">Completion Velocity</span>
                 <span className="text-lg font-bold text-emerald-400">{taskCompletionRate}%</span>
               </div>
               <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
@@ -442,13 +499,21 @@ export const DashboardPage: React.FC = () => {
                   </span>
                   <span className="font-semibold text-slate-100">{pendingTasksCount}</span>
                 </div>
+                {overdueTasksCount > 0 && (
+                  <div className="flex items-center justify-between text-rose-400">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> Overdue
+                    </span>
+                    <span className="font-bold">{overdueTasksCount}</span>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 4. Today's Accountability Widget */}
+      {/* 5. Today's Accountability Card */}
       <Card className="bg-gradient-to-br from-slate-900/90 to-slate-900/40 border-slate-800">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -531,7 +596,7 @@ export const DashboardPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* 5. Active Goals & Upcoming Tasks (2 Columns) */}
+      {/* 6. Active Goals with Health Status & Upcoming Tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Active Goals */}
         <Card>
@@ -557,53 +622,47 @@ export const DashboardPage: React.FC = () => {
               </div>
             ) : goalsPage?.content && goalsPage.content.length > 0 ? (
               <div className="space-y-3">
-                {goalsPage.content.map((goal) => (
-                  <div
-                    key={goal.id}
-                    className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 hover:border-slate-700/80 transition-all space-y-2 group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-200">{goal.title}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          size="sm"
-                          variant={
-                            goal.priority === 'CRITICAL' || goal.priority === 'HIGH'
-                              ? 'danger'
-                              : goal.priority === 'MEDIUM'
-                              ? 'warning'
-                              : 'default'
-                          }
-                        >
-                          {goal.priority}
-                        </Badge>
-                        <button
-                          onClick={() => {
-                            setSelectedGoalForProgress(goal);
-                            setGoalProgressValue(goal.progress);
-                          }}
-                          className="text-slate-400 hover:text-primary-300 p-1 transition-colors"
-                          title="Quick update progress"
-                        >
-                          <Sliders className="w-3.5 h-3.5" />
-                        </button>
+                {goalsPage.content.map((goal) => {
+                  const health = getGoalHealth(goal);
+                  return (
+                    <div
+                      key={goal.id}
+                      className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 hover:border-slate-700/80 transition-all space-y-2 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-200 truncate max-w-[200px]">{goal.title}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge size="sm" variant={health.variant}>
+                            {health.label}
+                          </Badge>
+                          <button
+                            onClick={() => {
+                              setSelectedGoalForProgress(goal);
+                              setGoalProgressValue(goal.progress);
+                            }}
+                            className="text-slate-400 hover:text-primary-300 p-1 transition-colors"
+                            title="Quick update progress"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] text-slate-400">
-                        <span>Progress: {goal.progress}%</span>
-                        <span>Due: {formatDate(goal.targetDate)}</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary-600 to-indigo-500 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(goal.progress, 100)}%` }}
-                        />
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span>Progress: {goal.progress}%</span>
+                          <span>Due: {formatDate(goal.targetDate)}</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary-600 to-indigo-500 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <EmptyState
@@ -646,7 +705,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             ) : tasksPage?.content && tasksPage.content.length > 0 ? (
               <div className="space-y-2.5">
-                {tasksPage.content.map((task) => {
+                {tasksPage.content.slice(0, 5).map((task) => {
                   const isCompleted = task.status === 'COMPLETED';
                   return (
                     <div
@@ -674,7 +733,7 @@ export const DashboardPage: React.FC = () => {
                             {task.title}
                           </p>
                           <p className="text-[10px] text-slate-500 truncate">
-                            {task.goalTitle} • Assignee: {task.assigneeName}
+                            {task.goalTitle} • {task.assigneeName}
                           </p>
                         </div>
                       </div>
@@ -715,9 +774,9 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* 6. Team Leaderboard Podium & Recent Achievements */}
+      {/* 7. Team Leaderboard Podium & Recent Achievements */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Team Leaderboard Podium (2 columns wide) */}
+        {/* Team Leaderboard Podium */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between w-full">
@@ -774,7 +833,7 @@ export const DashboardPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Recent Achievements (1 column wide) */}
+        {/* Recent Achievements */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between w-full">

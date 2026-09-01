@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   UserPlus,
@@ -9,6 +9,9 @@ import {
   Sparkles,
   CheckCircle2,
   Calendar,
+  Search,
+  Mail,
+  Eye,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -23,13 +26,17 @@ import { useTeamMembers, useAddTeamMember } from '@/hooks/useTeams';
 import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
 import { formatDate } from '@/lib/utils';
+import { TeamMember } from '@/types/team';
 
 export const TeamPage: React.FC = () => {
   const { activeTeam, users } = useApp();
   const { showToast } = useToast();
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [viewingMember, setViewingMember] = useState<TeamMember | null>(null);
 
   const { data: membersPage, isLoading: isMembersLoading } = useTeamMembers(activeTeam?.id, { size: 50 });
   const { data: goalsPage } = useGoals({ teamId: activeTeam?.id, active: true, size: 50 });
@@ -37,9 +44,20 @@ export const TeamPage: React.FC = () => {
 
   const addMemberMutation = useAddTeamMember();
 
-  // Find users not yet in team
-  const existingMemberUserIds = new Set(membersPage?.content?.map((m) => m.userId) || []);
+  const allMembers = membersPage?.content || [];
+  const existingMemberUserIds = new Set(allMembers.map((m) => m.userId));
   const availableUsersToInvite = users.filter((u) => !existingMemberUserIds.has(u.id));
+
+  // Filtered members list
+  const filteredMembers = useMemo(() => {
+    return allMembers.filter((m) => {
+      const matchesSearch =
+        m.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.userEmail.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = roleFilter === 'ALL' || m.role === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [allMembers, searchQuery, roleFilter]);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +118,7 @@ export const TeamPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Total Members</span>
+            <span className="text-xs font-medium text-slate-400">Total Members</span>
             <Users className="w-4 h-4 text-sky-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100 mt-2">{totalMembers}</div>
@@ -109,7 +127,7 @@ export const TeamPage: React.FC = () => {
 
         <Card>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Active Goals</span>
+            <span className="text-xs font-medium text-slate-400">Active Goals</span>
             <Sparkles className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100 mt-2">{totalGoals}</div>
@@ -118,7 +136,7 @@ export const TeamPage: React.FC = () => {
 
         <Card>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Completed Tasks</span>
+            <span className="text-xs font-medium text-slate-400">Completed Tasks</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100 mt-2">{completedTasks}</div>
@@ -126,12 +144,39 @@ export const TeamPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* 3. Team Member Roster */}
+      {/* 3. Member Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-md">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search team members by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
+
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Roles</option>
+            <option value="OWNER">Owner</option>
+            <option value="ADMIN">Admin</option>
+            <option value="MEMBER">Member</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 4. Team Member Roster */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between w-full">
             <CardTitle>Member Directory</CardTitle>
-            <span className="text-xs text-slate-500">{totalMembers} members</span>
+            <span className="text-xs text-slate-500">{filteredMembers.length} members</span>
           </div>
         </CardHeader>
         <CardContent>
@@ -140,7 +185,7 @@ export const TeamPage: React.FC = () => {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : membersPage?.content && membersPage.content.length > 0 ? (
+          ) : filteredMembers.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-300">
                 <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
@@ -150,14 +195,15 @@ export const TeamPage: React.FC = () => {
                     <th className="px-4 py-3">Role</th>
                     <th className="px-4 py-3">Joined Date</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {membersPage.content.map((m) => (
+                  {filteredMembers.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-850/50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-primary-950 border border-primary-800 flex items-center justify-center text-primary-300 font-bold text-xs shrink-0">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
                             {m.userName.charAt(0).toUpperCase()}
                           </div>
                           <span className="font-semibold text-slate-100">{m.userName}</span>
@@ -188,6 +234,15 @@ export const TeamPage: React.FC = () => {
                           {m.active ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setViewingMember(m)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                          title="View member card"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -196,7 +251,7 @@ export const TeamPage: React.FC = () => {
           ) : (
             <EmptyState
               icon={Users}
-              title="No team members yet"
+              title="No team members found"
               description="Invite other developers to your team to start daily synchronization."
               action={
                 <Button variant="primary" size="sm" onClick={() => setIsInviteModalOpen(true)}>
@@ -208,7 +263,7 @@ export const TeamPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* 4. Team Activity Stream */}
+      {/* 5. Team Activity Stream */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -230,7 +285,7 @@ export const TeamPage: React.FC = () => {
                   <div>
                     <span className="text-slate-200 font-medium">{t.assigneeName}</span>{' '}
                     <span className="text-slate-400">
-                      {t.status === 'COMPLETED' ? 'completed task' : 'is working on'}:
+                      {t.status === 'COMPLETED' ? 'completed sprint task' : 'is working on'}:
                     </span>{' '}
                     <span className="text-slate-100 font-semibold">{t.title}</span>
                   </div>
@@ -250,6 +305,50 @@ export const TeamPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Member Detail Modal */}
+      {viewingMember && (
+        <Modal
+          isOpen={!!viewingMember}
+          onClose={() => setViewingMember(null)}
+          title={`Team Member: ${viewingMember.userName}`}
+          description="Workspace membership details and role assignment"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white font-bold text-base shadow-md">
+                {viewingMember.userName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-100 truncate">{viewingMember.userName}</h3>
+                <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-500" /> {viewingMember.userEmail}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Workspace Role</span>
+                <span className="font-bold text-slate-200 mt-1 block">{viewingMember.role}</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Joined Date</span>
+                <span className="font-bold text-slate-200 mt-1 block">
+                  {formatDate(viewingMember.joinedAt)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setViewingMember(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Add / Invite Member Modal */}
       <Modal

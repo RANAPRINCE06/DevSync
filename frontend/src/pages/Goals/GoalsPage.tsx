@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Target,
   Plus,
-  Calendar,
+  Search,
   Sliders,
-  Edit2,
+  Calendar,
   Trash2,
+  Edit2,
+  CheckSquare,
   Eye,
-  CheckCircle2,
-  Filter,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -20,155 +20,184 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Pagination } from '@/components/ui/Pagination';
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
 import { formatDate } from '@/lib/utils';
-import { Goal, GoalPriority, GoalStatus } from '@/types/goal';
+import { Goal, GoalPriority } from '@/types/goal';
 
 export const GoalsPage: React.FC = () => {
   const { activeUser, activeTeam } = useApp();
   const { showToast } = useToast();
 
-  const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<'TARGET_DATE' | 'PROGRESS' | 'PRIORITY'>('TARGET_DATE');
 
-  // Modal states
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Modals
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [viewingGoal, setViewingGoal] = useState<Goal | null>(null);
-  const [progressGoal, setProgressGoal] = useState<Goal | null>(null);
-  const [sliderProgress, setSliderProgress] = useState<number>(0);
+  const [progressModalGoal, setProgressModalGoal] = useState<Goal | null>(null);
+  const [sliderProgress, setSliderProgress] = useState(0);
   const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
 
   // Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<GoalPriority>('MEDIUM');
-  const [goalStatus, setGoalStatus] = useState<GoalStatus>('IN_PROGRESS');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [targetDate, setTargetDate] = useState(
-    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [progressVal, setProgressVal] = useState(0);
+  const [targetDate, setTargetDate] = useState('');
+  const [progress, setProgress] = useState(0);
 
-  const { data: goalsData, isLoading } = useGoals({
+  // Queries
+  const { data: goalsPage, isLoading: isGoalsLoading } = useGoals({
     teamId: activeTeam?.id,
-    status: statusFilter !== 'ALL' ? (statusFilter as GoalStatus) : undefined,
-    priority: priorityFilter !== 'ALL' ? (priorityFilter as GoalPriority) : undefined,
     active: true,
-    page,
-    size: 9,
-    sort: 'targetDate,asc',
+    size: 50,
   });
 
-  // Query tasks for viewing goal details
-  const { data: viewingTasksData } = useTasks({
-    goalId: viewingGoal?.id,
+  const { data: tasksPage } = useTasks({
+    teamId: activeTeam?.id,
     active: true,
-    size: 20,
+    size: 100,
   });
 
-  const createMutation = useCreateGoal();
-  const updateMutation = useUpdateGoal();
-  const deleteMutation = useDeleteGoal();
+  // Mutations
+  const createGoalMutation = useCreateGoal();
+  const updateGoalMutation = useUpdateGoal();
+  const deleteGoalMutation = useDeleteGoal();
+
+  const allGoals = goalsPage?.content || [];
+  const allTasks = tasksPage?.content || [];
+
+  // Goal Health Indicator Helper
+  const getGoalHealth = (goal: Goal) => {
+    if (goal.status === 'COMPLETED' || goal.progress >= 100) {
+      return { label: 'Completed', variant: 'success' as const };
+    }
+    const diff = new Date(goal.targetDate).getTime() - new Date().getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days < 0) {
+      return { label: 'Overdue', variant: 'danger' as const };
+    }
+    if (days <= 3 && goal.progress < 50) {
+      return { label: 'At Risk', variant: 'warning' as const };
+    }
+    return { label: 'On Track', variant: 'primary' as const };
+  };
+
+  // Filter & Sort Goals
+  const filteredGoals = useMemo(() => {
+    return allGoals
+      .filter((g) => {
+        const matchesSearch =
+          g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (g.description && g.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
+        const matchesPriority = priorityFilter === 'ALL' || g.priority === priorityFilter;
+        return matchesSearch && matchesStatus && matchesPriority;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'PROGRESS') return b.progress - a.progress;
+        if (sortBy === 'PRIORITY') {
+          const pOrder: Record<GoalPriority, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+          return pOrder[b.priority] - pOrder[a.priority];
+        }
+        return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
+      });
+  }, [allGoals, searchQuery, statusFilter, priorityFilter, sortBy]);
 
   const handleOpenCreate = () => {
     setEditingGoal(null);
     setTitle('');
     setDescription('');
     setPriority('MEDIUM');
-    setGoalStatus('IN_PROGRESS');
     setStartDate(new Date().toISOString().split('T')[0]);
-    setTargetDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setProgressVal(0);
-    setIsCreateModalOpen(true);
+    const target = new Date();
+    target.setDate(target.getDate() + 14);
+    setTargetDate(target.toISOString().split('T')[0]);
+    setProgress(0);
+    setIsCreateOpen(true);
   };
 
-  const handleOpenEdit = (goal: Goal) => {
-    setEditingGoal(goal);
-    setTitle(goal.title);
-    setDescription(goal.description || '');
-    setPriority(goal.priority);
-    setGoalStatus(goal.status);
-    setStartDate(goal.startDate);
-    setTargetDate(goal.targetDate);
-    setProgressVal(goal.progress);
-    setIsCreateModalOpen(true);
+  const handleOpenEdit = (g: Goal) => {
+    setEditingGoal(g);
+    setTitle(g.title);
+    setDescription(g.description || '');
+    setPriority(g.priority);
+    setStartDate(g.startDate);
+    setTargetDate(g.targetDate);
+    setProgress(g.progress);
+    setIsCreateOpen(true);
   };
 
-  const handleSubmitGoal = async (e: React.FormEvent) => {
+  const handleSaveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeUser || !activeTeam) {
-      showToast('error', 'Please select an active team and user');
+    if (!title.trim()) {
+      showToast('warning', 'Title is required');
       return;
     }
-    if (!title.trim()) {
-      showToast('warning', 'Goal title is required');
+    if (!activeUser || !activeTeam) {
+      showToast('error', 'Active user and team required');
       return;
     }
 
     try {
       if (editingGoal) {
-        await updateMutation.mutateAsync({
+        await updateGoalMutation.mutateAsync({
           id: editingGoal.id,
           data: {
-            title,
+            title: title.trim(),
             description: description.trim() ? description : undefined,
             priority,
-            status: progressVal >= 100 ? 'COMPLETED' : goalStatus,
-            progress: progressVal,
             startDate,
             targetDate,
-            active: true,
+            progress,
+            status: progress >= 100 ? 'COMPLETED' : editingGoal.status,
           },
         });
-        showToast('success', 'Goal updated successfully');
+        showToast('success', 'Goal updated successfully!');
       } else {
-        await createMutation.mutateAsync({
+        await createGoalMutation.mutateAsync({
           ownerId: activeUser.id,
           teamId: activeTeam.id,
-          title,
+          title: title.trim(),
           description: description.trim() ? description : undefined,
           priority,
-          status: progressVal >= 100 ? 'COMPLETED' : goalStatus,
-          progress: progressVal,
           startDate,
           targetDate,
         });
         showToast('success', 'Goal created successfully!');
       }
-      setIsCreateModalOpen(false);
+      setIsCreateOpen(false);
     } catch (err: unknown) {
       showToast('error', 'Failed to save goal', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const handleUpdateProgressSlider = async (e: React.FormEvent) => {
+  const handleSaveQuickProgress = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!progressGoal) return;
-
+    if (!progressModalGoal) return;
     try {
       const isCompleted = sliderProgress >= 100;
-      await updateMutation.mutateAsync({
-        id: progressGoal.id,
+      await updateGoalMutation.mutateAsync({
+        id: progressModalGoal.id,
         data: {
-          title: progressGoal.title,
-          description: progressGoal.description || undefined,
-          priority: progressGoal.priority,
-          startDate: progressGoal.startDate,
-          targetDate: progressGoal.targetDate,
+          title: progressModalGoal.title,
+          description: progressModalGoal.description || undefined,
+          priority: progressModalGoal.priority,
+          startDate: progressModalGoal.startDate,
+          targetDate: progressModalGoal.targetDate,
           progress: sliderProgress,
           status: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
         },
       });
       showToast(
         'success',
-        isCompleted ? 'Goal marked as Completed at 100%! (+50 score)' : `Goal progress updated to ${sliderProgress}%`
+        isCompleted ? 'Goal completed at 100%! (+50 score)' : `Goal progress updated to ${sliderProgress}%`
       );
-      setProgressGoal(null);
+      setProgressModalGoal(null);
     } catch (err: unknown) {
       showToast('error', 'Failed to update progress', err instanceof Error ? err.message : 'Unknown error');
     }
@@ -177,103 +206,140 @@ export const GoalsPage: React.FC = () => {
   const handleDeleteGoal = async () => {
     if (!deletingGoalId) return;
     try {
-      await deleteMutation.mutateAsync(deletingGoalId);
-      showToast('success', 'Goal deleted successfully');
+      await deleteGoalMutation.mutateAsync(deletingGoalId);
+      showToast('info', 'Goal deleted successfully');
       setDeletingGoalId(null);
     } catch (err: unknown) {
       showToast('error', 'Failed to delete goal', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const filteredGoals =
-    goalsData?.content?.filter((g) => g.title.toLowerCase().includes(searchQuery.toLowerCase())) || [];
-
-  const getDaysRemaining = (targetDateStr: string) => {
-    const diff = new Date(targetDateStr).getTime() - new Date().getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days < 0) return { label: `${Math.abs(days)}d overdue`, isOverdue: true };
-    if (days === 0) return { label: 'Due today', isOverdue: false };
-    return { label: `${days}d left`, isOverdue: false };
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Header */}
+      {/* 1. Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Target className="w-5 h-5 text-indigo-400" />
-            Learning & Development Goals
+            Learning Goals & Objectives
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Set long-term learning goals, track milestones, and break them down into actionable tasks.
+            Track high-level engineering objectives and technical milestones.
           </p>
         </div>
-        <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={handleOpenCreate}>
-          New Goal
+
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus className="w-4 h-4" />}
+          onClick={handleOpenCreate}
+        >
+          Create Goal
         </Button>
       </div>
 
-      {/* 2. Controls & Filter Bar */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Input
-            placeholder="Search goals by title..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* 2. Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-xl">
+          {/* Search */}
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search goals..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
 
-          <Select
+          {/* Status Filter */}
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { label: 'All Statuses', value: 'ALL' },
-              { label: 'In Progress', value: 'IN_PROGRESS' },
-              { label: 'Completed', value: 'COMPLETED' },
-              { label: 'Not Started', value: 'NOT_STARTED' },
-              { label: 'On Hold', value: 'ON_HOLD' },
-              { label: 'Cancelled', value: 'CANCELLED' },
-            ]}
-          />
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="NOT_STARTED">Not Started</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="ON_HOLD">On Hold</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
 
-          <Select
+          {/* Priority Filter */}
+          <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            options={[
-              { label: 'All Priorities', value: 'ALL' },
-              { label: 'Critical', value: 'CRITICAL' },
-              { label: 'High', value: 'HIGH' },
-              { label: 'Medium', value: 'MEDIUM' },
-              { label: 'Low', value: 'LOW' },
-            ]}
-          />
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+            <option value="CRITICAL">Critical</option>
+          </select>
         </div>
-      </Card>
 
-      {/* 3. Goal Cards Grid */}
-      <div>
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Skeleton className="h-44 w-full" />
-            <Skeleton className="h-44 w-full" />
-            <Skeleton className="h-44 w-full" />
-          </div>
-        ) : filteredGoals.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredGoals.map((goal) => {
-              const daysInfo = getDaysRemaining(goal.targetDate);
-              const isCompleted = goal.status === 'COMPLETED';
-              return (
-                <Card key={goal.id} hoverable className="flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-slate-100 line-clamp-1">{goal.title}</h3>
+        {/* Sort Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="TARGET_DATE">Target Date</option>
+            <option value="PROGRESS">Progress %</option>
+            <option value="PRIORITY">Priority</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. Goals Grid */}
+      {isGoalsLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
+          <Skeleton className="h-48 rounded-2xl" />
+        </div>
+      ) : filteredGoals.length === 0 ? (
+        <EmptyState
+          icon={Target}
+          title="No goals match criteria"
+          description="Create your first goal or try adjusting your search filters."
+          action={
+            <Button variant="primary" size="sm" onClick={handleOpenCreate}>
+              Create Goal
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredGoals.map((goal) => {
+            const health = getGoalHealth(goal);
+            const associatedTasks = allTasks.filter((t) => t.goalId === goal.id);
+            const completedCount = associatedTasks.filter((t) => t.status === 'COMPLETED').length;
+
+            return (
+              <Card
+                key={goal.id}
+                hoverable
+                className="flex flex-col justify-between p-4 space-y-3 relative group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-100 line-clamp-1">{goal.title}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge size="sm" variant={health.variant}>
+                        {health.label}
+                      </Badge>
                       <Badge
                         size="sm"
                         variant={
-                          goal.priority === 'CRITICAL' || goal.priority === 'HIGH'
+                          goal.priority === 'CRITICAL'
                             ? 'danger'
-                            : goal.priority === 'MEDIUM'
+                            : goal.priority === 'HIGH'
                             ? 'warning'
                             : 'default'
                         }
@@ -281,128 +347,91 @@ export const GoalsPage: React.FC = () => {
                         {goal.priority}
                       </Badge>
                     </div>
-
-                    {goal.description && (
-                      <p className="text-xs text-slate-400 line-clamp-2">{goal.description}</p>
-                    )}
-
-                    {/* Progress slider / bar */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Progress</span>
-                        <span className="font-bold text-primary-400">{goal.progress}%</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            isCompleted
-                              ? 'bg-emerald-500'
-                              : 'bg-gradient-to-r from-primary-600 to-indigo-500'
-                          }`}
-                          style={{ width: `${Math.min(goal.progress, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {formatDate(goal.targetDate)}
-                      </span>
-                      <span
-                        className={
-                          daysInfo.isOverdue && !isCompleted ? 'text-rose-400 font-medium' : 'text-slate-400'
-                        }
-                      >
-                        {isCompleted ? 'Completed' : daysInfo.label}
-                      </span>
-                    </div>
                   </div>
 
-                  {/* Actions Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
-                    <Badge variant={isCompleted ? 'success' : 'primary'} size="sm">
-                      {goal.status}
-                    </Badge>
+                  {goal.description && (
+                    <p className="text-xs text-slate-400 line-clamp-2 mt-1.5">{goal.description}</p>
+                  )}
+                </div>
 
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setProgressGoal(goal);
-                          setSliderProgress(goal.progress);
-                        }}
-                        title="Update progress slider"
-                      >
-                        <Sliders className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setViewingGoal(goal)}
-                        title="View details & tasks"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenEdit(goal)}
-                        title="Edit goal"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-rose-400 hover:text-rose-300"
-                        onClick={() => setDeletingGoalId(goal.id)}
-                        title="Delete goal"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                {/* Progress Bar & Stats */}
+                <div className="space-y-2 pt-2 border-t border-slate-850">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>Progress</span>
+                    <span className="font-bold text-primary-400">{goal.progress}%</span>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState
-            icon={Filter}
-            title="No goals found"
-            description="Create your first development goal or adjust your search filters."
-            action={
-              <Button variant="primary" size="sm" onClick={handleOpenCreate}>
-                Create Goal
-              </Button>
-            }
-          />
-        )}
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-600 to-indigo-500 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                    />
+                  </div>
 
-        {goalsData && goalsData.totalPages > 1 && (
-          <Pagination
-            currentPage={page}
-            totalPages={goalsData.totalPages}
-            totalElements={goalsData.totalElements}
-            onPageChange={setPage}
-          />
-        )}
-      </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-400" />
+                      Due {formatDate(goal.targetDate)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckSquare className="w-3 h-3 text-slate-400" />
+                      {completedCount}/{associatedTasks.length} tasks
+                    </span>
+                  </div>
+                </div>
 
-      {/* Create / Edit Goal Modal */}
+                {/* Quick Action Footer */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-850">
+                  <button
+                    onClick={() => {
+                      setProgressModalGoal(goal);
+                      setSliderProgress(goal.progress);
+                    }}
+                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 font-medium transition-colors"
+                  >
+                    <Sliders className="w-3.5 h-3.5" /> Update %
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setViewingGoal(goal)}
+                      className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                      title="View Details"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenEdit(goal)}
+                      className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                      title="Edit Goal"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingGoalId(goal.id)}
+                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                      title="Delete Goal"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create/Edit Goal Modal */}
       <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title={editingGoal ? 'Edit Goal' : 'Create Learning Goal'}
-        description="Set a concrete target date and milestones for you and your team."
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title={editingGoal ? 'Edit Learning Goal' : 'Create Learning Goal'}
+        description="Set measurable objectives for your engineering growth."
       >
-        <form onSubmit={handleSubmitGoal} className="space-y-4">
+        <form onSubmit={handleSaveGoal} className="space-y-4">
           <Input
             label="Goal Title *"
-            placeholder="e.g. Master Binary Trees & Dynamic Programming"
+            placeholder="e.g. Master Distributed Systems & Event-Driven Architecture"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -410,41 +439,27 @@ export const GoalsPage: React.FC = () => {
 
           <Input
             label="Description (Optional)"
-            placeholder="e.g. Solve 50 medium problems and build an in-memory Trie"
+            placeholder="e.g. Read Designing Data-Intensive Applications chapters 1-6"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Select
               label="Priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value as GoalPriority)}
               options={[
+                { label: 'Low', value: 'LOW' },
                 { label: 'Medium', value: 'MEDIUM' },
                 { label: 'High', value: 'HIGH' },
                 { label: 'Critical', value: 'CRITICAL' },
-                { label: 'Low', value: 'LOW' },
               ]}
             />
 
-            <Select
-              label="Status"
-              value={goalStatus}
-              onChange={(e) => setGoalStatus(e.target.value as GoalStatus)}
-              options={[
-                { label: 'In Progress', value: 'IN_PROGRESS' },
-                { label: 'Not Started', value: 'NOT_STARTED' },
-                { label: 'Completed', value: 'COMPLETED' },
-                { label: 'On Hold', value: 'ON_HOLD' },
-              ]}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <Input
               type="date"
-              label="Start Date *"
+              label="Start Date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
@@ -452,37 +467,44 @@ export const GoalsPage: React.FC = () => {
 
             <Input
               type="date"
-              label="Target Date *"
+              label="Target Date"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
               required
             />
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-slate-300">
-              <span>Initial Progress</span>
-              <span className="font-bold text-primary-400">{progressVal}%</span>
+          {editingGoal && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-slate-300">
+                <span>Progress</span>
+                <span className="font-bold text-primary-400">{progress}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={progress}
+                onChange={(e) => setProgress(Number(e.target.value))}
+                className="w-full accent-primary-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
+              />
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={progressVal}
-              onChange={(e) => setProgressVal(Number(e.target.value))}
-              className="w-full accent-primary-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
-            />
-          </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCreateOpen(false)}
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
               size="sm"
-              isLoading={createMutation.isPending || updateMutation.isPending}
+              isLoading={createGoalMutation.isPending || updateGoalMutation.isPending}
             >
               {editingGoal ? 'Update Goal' : 'Create Goal'}
             </Button>
@@ -490,15 +512,85 @@ export const GoalsPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Update Progress Slider Modal */}
-      {progressGoal && (
+      {/* Goal Details Modal */}
+      {viewingGoal && (
         <Modal
-          isOpen={!!progressGoal}
-          onClose={() => setProgressGoal(null)}
-          title={`Update Progress: ${progressGoal.title}`}
-          description="Slide to adjust progress. Reaching 100% will automatically mark this goal as Completed."
+          isOpen={!!viewingGoal}
+          onClose={() => setViewingGoal(null)}
+          title={viewingGoal.title}
+          description={`Created on ${formatDate(viewingGoal.createdAt)}`}
         >
-          <form onSubmit={handleUpdateProgressSlider} className="space-y-5">
+          <div className="space-y-4 text-xs">
+            {viewingGoal.description && (
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">
+                  Description
+                </span>
+                <p className="text-slate-200">{viewingGoal.description}</p>
+              </div>
+            )}
+
+            {/* Health & Progress */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Health Status</span>
+                <Badge size="sm" variant={getGoalHealth(viewingGoal).variant} className="mt-1">
+                  {getGoalHealth(viewingGoal).label}
+                </Badge>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Target Deadline</span>
+                <span className="font-semibold text-slate-200 mt-1 block">
+                  {formatDate(viewingGoal.targetDate)}
+                </span>
+              </div>
+            </div>
+
+            {/* Associated Tasks List */}
+            <div className="space-y-2">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
+                Associated Tasks
+              </span>
+              {allTasks.filter((t) => t.goalId === viewingGoal.id).length > 0 ? (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {allTasks
+                    .filter((t) => t.goalId === viewingGoal.id)
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center justify-between"
+                      >
+                        <span className="text-slate-300 truncate">{task.title}</span>
+                        <Badge size="sm" variant={task.status === 'COMPLETED' ? 'success' : 'default'}>
+                          {task.status}
+                        </Badge>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 italic">No associated tasks created for this goal yet.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setViewingGoal(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Quick Progress Slider Modal */}
+      {progressModalGoal && (
+        <Modal
+          isOpen={!!progressModalGoal}
+          onClose={() => setProgressModalGoal(null)}
+          title={`Update Progress: ${progressModalGoal.title}`}
+          description="Adjust current goal progress. 100% completion awards 50 points to team leaderboard."
+        >
+          <form onSubmit={handleSaveQuickProgress} className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-300">
                 <span>Progress Percentage</span>
@@ -515,91 +607,24 @@ export const GoalsPage: React.FC = () => {
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-              <Button type="button" variant="outline" size="sm" onClick={() => setProgressGoal(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setProgressModalGoal(null)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="sm" isLoading={updateMutation.isPending}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={updateGoalMutation.isPending}
+              >
                 Save Progress
               </Button>
             </div>
           </form>
-        </Modal>
-      )}
-
-      {/* Goal Details & Associated Tasks Modal */}
-      {viewingGoal && (
-        <Modal
-          isOpen={!!viewingGoal}
-          onClose={() => setViewingGoal(null)}
-          title={viewingGoal.title}
-          maxWidth="lg"
-        >
-          <div className="space-y-5 text-xs">
-            {viewingGoal.description && (
-              <p className="text-slate-300 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
-                {viewingGoal.description}
-              </p>
-            )}
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-slate-500 block">Progress</span>
-                <span className="text-primary-300 font-bold text-sm">{viewingGoal.progress}%</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-slate-500 block">Start Date</span>
-                <span className="text-slate-200">{formatDate(viewingGoal.startDate)}</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-slate-500 block">Target Date</span>
-                <span className="text-slate-200">{formatDate(viewingGoal.targetDate)}</span>
-              </div>
-            </div>
-
-            {/* Associated Tasks */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Associated Tasks ({viewingTasksData?.content?.length || 0})
-              </h4>
-              {viewingTasksData?.content && viewingTasksData.content.length > 0 ? (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {viewingTasksData.content.map((t) => (
-                    <div
-                      key={t.id}
-                      className="p-2.5 rounded-lg bg-slate-950/50 border border-slate-800 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            t.status === 'COMPLETED' ? 'bg-emerald-400' : 'bg-primary-400'
-                          }`}
-                        />
-                        <span
-                          className={
-                            t.status === 'COMPLETED' ? 'line-through text-slate-500' : 'text-slate-200'
-                          }
-                        >
-                          {t.title}
-                        </span>
-                      </div>
-                      <Badge size="sm" variant={t.status === 'COMPLETED' ? 'success' : 'default'}>
-                        {t.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-slate-500 text-xs italic">No tasks created under this goal yet.</p>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-800">
-              <Button variant="outline" size="sm" onClick={() => setViewingGoal(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
         </Modal>
       )}
 
@@ -609,7 +634,7 @@ export const GoalsPage: React.FC = () => {
           isOpen={!!deletingGoalId}
           onClose={() => setDeletingGoalId(null)}
           title="Delete Goal"
-          description="Are you sure you want to deactivate and remove this goal? This action will archive associated tasks."
+          description="Are you sure you want to delete this goal? Any associated tasks will remain."
         >
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" size="sm" onClick={() => setDeletingGoalId(null)}>
@@ -618,10 +643,10 @@ export const GoalsPage: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              isLoading={deleteMutation.isPending}
               onClick={handleDeleteGoal}
+              isLoading={deleteGoalMutation.isPending}
             >
-              Delete Goal
+              Confirm Delete
             </Button>
           </div>
         </Modal>

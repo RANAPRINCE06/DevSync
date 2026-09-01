@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   CheckSquare,
   Plus,
+  Search,
+  Calendar,
+  User as UserIcon,
+  Target,
   Edit2,
   Trash2,
   CheckCircle2,
-  List,
+  AlertCircle,
+  Eye,
   Kanban,
-  User as UserIcon,
-  Filter,
+  List,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -20,142 +23,177 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Pagination } from '@/components/ui/Pagination';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useGoals } from '@/hooks/useGoals';
 import { formatDate } from '@/lib/utils';
-import { Task, TaskPriority, TaskStatus } from '@/types/task';
+import { Task, TaskStatus, TaskPriority } from '@/types/task';
 
 export const TasksPage: React.FC = () => {
   const { activeUser, activeTeam, users } = useApp();
   const { showToast } = useToast();
 
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
-  const [page, setPage] = useState(0);
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
-  const [selectedGoalFilter, setSelectedGoalFilter] = useState<string>('ALL');
+  const [goalFilter, setGoalFilter] = useState<string>('ALL');
+  const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<'PRIORITY' | 'DUE_DATE' | 'CREATED_AT'>('DUE_DATE');
 
-  // Modal States
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Modals
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
 
-  // Form Fields
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDescription, setTaskDescription] = useState('');
-  const [goalId, setGoalId] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [taskPriority, setTaskPriority] = useState<TaskPriority>('MEDIUM');
-  const [taskStatus, setTaskStatus] = useState<TaskStatus>('TODO');
-  const [estimatedMinutes, setEstimatedMinutes] = useState(60);
-  const [dueDate, setDueDate] = useState(
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  // Form states
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
+  const [status, setStatus] = useState<TaskStatus>('TODO');
+  const [selectedGoalId, setSelectedGoalId] = useState('');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number>(60);
+  const [dueDate, setDueDate] = useState('');
 
-  const { data: tasksData, isLoading } = useTasks({
+  // Queries
+  const { data: tasksPage, isLoading: isTasksLoading } = useTasks({
     teamId: activeTeam?.id,
-    goalId: selectedGoalFilter !== 'ALL' ? selectedGoalFilter : undefined,
-    status: statusFilter !== 'ALL' ? (statusFilter as TaskStatus) : undefined,
-    priority: priorityFilter !== 'ALL' ? (priorityFilter as TaskPriority) : undefined,
     active: true,
-    page,
-    size: viewMode === 'kanban' ? 50 : 10,
-    sort: 'dueDate,asc',
+    size: 100,
   });
 
-  const { data: goalsData } = useGoals({ teamId: activeTeam?.id, active: true, size: 50 });
+  const { data: goalsPage } = useGoals({
+    teamId: activeTeam?.id,
+    active: true,
+    size: 50,
+  });
 
-  const createMutation = useCreateTask();
-  const updateMutation = useUpdateTask();
-  const deleteMutation = useDeleteTask();
+  // Mutations
+  const createTaskMutation = useCreateTask();
+  const updateTaskMutation = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask();
+
+  const goalsList = goalsPage?.content || [];
+  const allTasks = tasksPage?.content || [];
+
+  // Filtered & Sorted Tasks
+  const filteredTasks = useMemo(() => {
+    return allTasks
+      .filter((t) => {
+        const matchesSearch =
+          t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (t.assigneeName && t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+        const matchesPriority = priorityFilter === 'ALL' || t.priority === priorityFilter;
+        const matchesGoal = goalFilter === 'ALL' || t.goalId === goalFilter;
+
+        const isTaskOverdue =
+          t.dueDate &&
+          t.status !== 'COMPLETED' &&
+          new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
+        const matchesOverdue = !onlyOverdue || isTaskOverdue;
+
+        return matchesSearch && matchesStatus && matchesPriority && matchesGoal && matchesOverdue;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'PRIORITY') {
+          const pOrder: Record<TaskPriority, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+          return pOrder[b.priority] - pOrder[a.priority];
+        }
+        if (sortBy === 'DUE_DATE') {
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }, [allTasks, searchQuery, statusFilter, priorityFilter, goalFilter, onlyOverdue, sortBy]);
 
   const handleOpenCreate = () => {
     setEditingTask(null);
-    setTaskTitle('');
-    setTaskDescription('');
-    setGoalId(goalsData?.content?.[0]?.id || '');
-    setAssigneeId(activeUser?.id || users[0]?.id || '');
-    setTaskPriority('MEDIUM');
-    setTaskStatus('TODO');
+    setTitle('');
+    setDescription('');
+    setPriority('MEDIUM');
+    setStatus('TODO');
+    setSelectedGoalId(goalsList[0]?.id || '');
+    setSelectedAssigneeId(activeUser?.id || users[0]?.id || '');
     setEstimatedMinutes(60);
-    setDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setIsCreateModalOpen(true);
+    setDueDate('');
+    setIsCreateOpen(true);
   };
 
-  const handleOpenEdit = (task: Task) => {
-    setEditingTask(task);
-    setTaskTitle(task.title);
-    setTaskDescription(task.description || '');
-    setGoalId(task.goalId);
-    setAssigneeId(task.assigneeId);
-    setTaskPriority(task.priority);
-    setTaskStatus(task.status);
-    setEstimatedMinutes(task.estimatedMinutes || 60);
-    setDueDate(task.dueDate || new Date().toISOString().split('T')[0]);
-    setIsCreateModalOpen(true);
+  const handleOpenEdit = (t: Task) => {
+    setEditingTask(t);
+    setTitle(t.title);
+    setDescription(t.description || '');
+    setPriority(t.priority);
+    setStatus(t.status);
+    setSelectedGoalId(t.goalId);
+    setSelectedAssigneeId(t.assigneeId);
+    setEstimatedMinutes(t.estimatedMinutes || 60);
+    setDueDate(t.dueDate || '');
+    setIsCreateOpen(true);
   };
 
-  const handleSubmitTask = async (e: React.FormEvent) => {
+  const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!goalId) {
-      showToast('warning', 'Please select an associated goal for this task');
-      return;
-    }
-    if (!assigneeId) {
-      showToast('warning', 'Please select an assignee for this task');
-      return;
-    }
-    if (!taskTitle.trim()) {
+    if (!title.trim()) {
       showToast('warning', 'Task title is required');
+      return;
+    }
+    if (!selectedGoalId) {
+      showToast('warning', 'Please select an associated goal');
+      return;
+    }
+    if (!selectedAssigneeId) {
+      showToast('warning', 'Please select an assignee');
       return;
     }
 
     try {
       if (editingTask) {
-        await updateMutation.mutateAsync({
+        await updateTaskMutation.mutateAsync({
           id: editingTask.id,
           data: {
-            title: taskTitle,
-            description: taskDescription.trim() ? taskDescription : undefined,
-            status: taskStatus,
-            priority: taskPriority,
+            title: title.trim(),
+            description: description.trim() ? description : undefined,
+            status,
+            priority,
             estimatedMinutes: Number(estimatedMinutes) || undefined,
-            dueDate,
+            dueDate: dueDate || undefined,
             active: true,
           },
         });
-        showToast('success', 'Task updated successfully');
+        showToast('success', 'Task updated successfully!');
       } else {
-        await createMutation.mutateAsync({
-          goalId,
-          assigneeId,
-          title: taskTitle,
-          description: taskDescription.trim() ? taskDescription : undefined,
-          status: taskStatus,
-          priority: taskPriority,
+        await createTaskMutation.mutateAsync({
+          goalId: selectedGoalId,
+          assigneeId: selectedAssigneeId,
+          title: title.trim(),
+          description: description.trim() ? description : undefined,
+          priority,
           estimatedMinutes: Number(estimatedMinutes) || undefined,
-          dueDate,
+          dueDate: dueDate || undefined,
         });
         showToast('success', 'Task created successfully!');
       }
-      setIsCreateModalOpen(false);
+      setIsCreateOpen(false);
     } catch (err: unknown) {
       showToast('error', 'Failed to save task', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const handleToggleComplete = async (task: Task) => {
+  const handleToggleTaskStatus = async (task: Task, nextStatus: TaskStatus) => {
     try {
-      const isCompleted = task.status === 'COMPLETED';
-      const newStatus: TaskStatus = isCompleted ? 'TODO' : 'COMPLETED';
-      await updateMutation.mutateAsync({
+      await updateTaskMutation.mutateAsync({
         id: task.id,
         data: {
           title: task.title,
           description: task.description || undefined,
-          status: newStatus,
+          status: nextStatus,
           priority: task.priority,
           estimatedMinutes: task.estimatedMinutes || undefined,
           actualMinutes: task.actualMinutes || undefined,
@@ -163,218 +201,312 @@ export const TasksPage: React.FC = () => {
           active: true,
         },
       });
-      showToast('success', isCompleted ? 'Task moved to Todo' : 'Task completed! (+20 leaderboard score)');
+      showToast(
+        'success',
+        nextStatus === 'COMPLETED' ? 'Task marked completed! (+20 pts)' : `Task moved to ${nextStatus}`
+      );
     } catch (err: unknown) {
-      showToast('error', 'Failed to update task', err instanceof Error ? err.message : 'Unknown error');
+      showToast('error', 'Failed to update status', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
   const handleDeleteTask = async () => {
     if (!deletingTaskId) return;
     try {
-      await deleteMutation.mutateAsync(deletingTaskId);
-      showToast('success', 'Task deleted successfully');
+      await deleteTaskMutation.mutateAsync(deletingTaskId);
+      showToast('info', 'Task deleted successfully');
       setDeletingTaskId(null);
     } catch (err: unknown) {
       showToast('error', 'Failed to delete task', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const filteredTasks =
-    tasksData?.content?.filter((t) => t.title.toLowerCase().includes(searchQuery.toLowerCase())) || [];
-
-  const kanbanColumns: { status: TaskStatus; label: string; color: string }[] = [
-    { status: 'TODO', label: 'To Do', color: 'border-slate-700 bg-slate-900/50' },
-    { status: 'IN_PROGRESS', label: 'In Progress', color: 'border-primary-800/60 bg-primary-950/20' },
-    { status: 'COMPLETED', label: 'Completed', color: 'border-emerald-800/60 bg-emerald-950/20' },
+  const kanbanColumns: { id: TaskStatus; label: string; color: string }[] = [
+    { id: 'TODO', label: 'To Do', color: 'border-slate-700' },
+    { id: 'IN_PROGRESS', label: 'In Progress', color: 'border-primary-500/50' },
+    { id: 'COMPLETED', label: 'Completed', color: 'border-emerald-500/50' },
   ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Header & View Toggle */}
+      {/* 1. Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-emerald-400" />
-            Task Management & Sprints
+            Sprint & Milestone Tasks
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Organize, prioritize, and complete development tasks tied to your team goals.
+            Break down active learning goals into actionable units of work.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl">
+          {/* View switcher */}
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5">
             <button
-              onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                viewMode === 'kanban'
-                  ? 'bg-slate-800 text-slate-100 shadow-sm'
+              onClick={() => setViewMode('KANBAN')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                viewMode === 'KANBAN'
+                  ? 'bg-primary-600/30 text-primary-300 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Kanban className="w-3.5 h-3.5" />
-              Kanban
+              <Kanban className="w-3.5 h-3.5" /> Kanban
             </button>
             <button
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-slate-800 text-slate-100 shadow-sm'
+              onClick={() => setViewMode('LIST')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                viewMode === 'LIST'
+                  ? 'bg-primary-600/30 text-primary-300 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <List className="w-3.5 h-3.5" />
-              List
+              <List className="w-3.5 h-3.5" /> List
             </button>
           </div>
 
-          <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={handleOpenCreate}>
-            New Task
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus className="w-4 h-4" />}
+            onClick={handleOpenCreate}
+          >
+            Create Task
           </Button>
         </div>
       </div>
 
-      {/* 2. Search & Filters */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <Input
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {/* 2. Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-2xl">
+          {/* Search */}
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search tasks, descriptions, assignees..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
 
-          <Select
-            value={selectedGoalFilter}
-            onChange={(e) => setSelectedGoalFilter(e.target.value)}
-            options={[
-              { label: 'All Goals', value: 'ALL' },
-              ...(goalsData?.content?.map((g) => ({ label: g.title, value: g.id })) || []),
-            ]}
-          />
+          {/* Goal Filter */}
+          <select
+            value={goalFilter}
+            onChange={(e) => setGoalFilter(e.target.value)}
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Goals</option>
+            {goalsList.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
+              </option>
+            ))}
+          </select>
 
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { label: 'All Statuses', value: 'ALL' },
-              { label: 'To Do', value: 'TODO' },
-              { label: 'In Progress', value: 'IN_PROGRESS' },
-              { label: 'Completed', value: 'COMPLETED' },
-              { label: 'Blocked', value: 'BLOCKED' },
-              { label: 'Cancelled', value: 'CANCELLED' },
-            ]}
-          />
-
-          <Select
+          {/* Priority Filter */}
+          <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            options={[
-              { label: 'All Priorities', value: 'ALL' },
-              { label: 'Critical', value: 'CRITICAL' },
-              { label: 'High', value: 'HIGH' },
-              { label: 'Medium', value: 'MEDIUM' },
-              { label: 'Low', value: 'LOW' },
-            ]}
-          />
-        </div>
-      </Card>
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+            <option value="CRITICAL">Critical</option>
+          </select>
 
-      {/* 3. Main View: Kanban or List */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
+          {/* Overdue Toggle */}
+          <button
+            onClick={() => setOnlyOverdue(!onlyOverdue)}
+            className={`h-8 px-2.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
+              onlyOverdue
+                ? 'bg-rose-950/40 border-rose-800 text-rose-300'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> Overdue Only
+          </button>
         </div>
-      ) : viewMode === 'kanban' ? (
-        /* KANBAN VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {/* Sort selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="DUE_DATE">Due Date</option>
+            <option value="PRIORITY">Priority</option>
+            <option value="CREATED_AT">Newest First</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. Task Views */}
+      {isTasksLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+      ) : filteredTasks.length === 0 ? (
+        <EmptyState
+          icon={CheckSquare}
+          title="No matching tasks found"
+          description="Try clearing your search query or filters, or create a new task."
+          action={
+            <Button variant="primary" size="sm" onClick={handleOpenCreate}>
+              Create Task
+            </Button>
+          }
+        />
+      ) : viewMode === 'KANBAN' ? (
+        /* KANBAN BOARD */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           {kanbanColumns.map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.status);
+            const colTasks = filteredTasks.filter((t) => t.status === col.id);
             return (
-              <div key={col.status} className={`p-4 rounded-2xl border ${col.color} flex flex-col gap-3 min-h-[400px]`}>
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-slate-200">{col.label}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                    {colTasks.length}
-                  </span>
+              <div
+                key={col.id}
+                className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-3 space-y-3"
+              >
+                {/* Column Header */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-200">{col.label}</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400">
+                      {colTasks.length}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-3 flex-1">
-                  {colTasks.map((task) => (
-                    <Card key={task.id} hoverable className="p-3.5 space-y-3 bg-slate-900/90 border-slate-800">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2 min-w-0">
-                          <button
-                            onClick={() => handleToggleComplete(task)}
-                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                              task.status === 'COMPLETED'
-                                ? 'bg-emerald-600 border-emerald-500 text-white'
-                                : 'border-slate-700 hover:border-emerald-500 text-transparent'
-                            }`}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          </button>
-                          <span
-                            className={`text-xs font-semibold ${
-                              task.status === 'COMPLETED' ? 'line-through text-slate-500' : 'text-slate-100'
-                            }`}
-                          >
-                            {task.title}
-                          </span>
-                        </div>
+                {/* Column Tasks */}
+                <div className="space-y-2 min-h-[160px]">
+                  {colTasks.length > 0 ? (
+                    colTasks.map((t) => {
+                      const isOverdue =
+                        t.dueDate &&
+                        t.status !== 'COMPLETED' &&
+                        new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
 
-                        <Badge
-                          size="sm"
-                          variant={
-                            task.priority === 'CRITICAL' || task.priority === 'HIGH'
-                              ? 'danger'
-                              : task.priority === 'MEDIUM'
-                              ? 'warning'
-                              : 'default'
-                          }
+                      return (
+                        <div
+                          key={t.id}
+                          className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 transition-all space-y-2.5 group shadow-sm"
                         >
-                          {task.priority}
-                        </Badge>
-                      </div>
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-200 line-clamp-2">
+                              {t.title}
+                            </span>
+                            <Badge
+                              size="sm"
+                              variant={
+                                t.priority === 'CRITICAL'
+                                  ? 'danger'
+                                  : t.priority === 'HIGH'
+                                  ? 'warning'
+                                  : 'default'
+                              }
+                            >
+                              {t.priority}
+                            </Badge>
+                          </div>
 
-                      <p className="text-[11px] text-slate-400 truncate bg-slate-950/40 px-2 py-1 rounded-lg border border-slate-800/60">
-                        🎯 {task.goalTitle}
-                      </p>
+                          {t.description && (
+                            <p className="text-[11px] text-slate-400 line-clamp-2">
+                              {t.description}
+                            </p>
+                          )}
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
-                        <span className="flex items-center gap-1">
-                          <UserIcon className="w-3 h-3 text-slate-400" />
-                          {task.assigneeName}
-                        </span>
+                          <div className="space-y-1 pt-1 border-t border-slate-850 text-[10px] text-slate-500">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 truncate max-w-[130px]">
+                                <Target className="w-3 h-3 text-indigo-400 shrink-0" />
+                                {t.goalTitle}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <UserIcon className="w-3 h-3 text-slate-400" />
+                                {t.assigneeName}
+                              </span>
+                            </div>
 
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEdit(task)}
-                            title="Edit task"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-rose-400"
-                            onClick={() => setDeletingTaskId(task.id)}
-                            title="Delete task"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                            {t.dueDate && (
+                              <div
+                                className={`flex items-center gap-1 pt-0.5 ${
+                                  isOverdue ? 'text-rose-400 font-semibold' : 'text-slate-400'
+                                }`}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                <span>Due {formatDate(t.dueDate)}</span>
+                                {isOverdue && <span>(Overdue)</span>}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quick Status Buttons & Actions */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-850">
+                            <div className="flex items-center gap-1">
+                              {col.id !== 'TODO' && (
+                                <button
+                                  onClick={() => handleToggleTaskStatus(t, 'TODO')}
+                                  className="text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800"
+                                >
+                                  To Todo
+                                </button>
+                              )}
+                              {col.id !== 'IN_PROGRESS' && (
+                                <button
+                                  onClick={() => handleToggleTaskStatus(t, 'IN_PROGRESS')}
+                                  className="text-[10px] text-primary-400 hover:text-primary-300 px-1.5 py-0.5 rounded bg-primary-950/40 border border-primary-800/60"
+                                >
+                                  In Progress
+                                </button>
+                              )}
+                              {col.id !== 'COMPLETED' && (
+                                <button
+                                  onClick={() => handleToggleTaskStatus(t, 'COMPLETED')}
+                                  className="text-[10px] text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/60"
+                                >
+                                  Complete
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setViewingTask(t)}
+                                className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                                title="View details"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenEdit(t)}
+                                className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
+                                title="Edit task"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingTaskId(t.id)}
+                                className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                                title="Delete task"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
-
-                  {colTasks.length === 0 && (
-                    <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800/80 rounded-xl">
-                      No {col.label.toLowerCase()} tasks
+                      );
+                    })
+                  ) : (
+                    <div className="h-32 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-800/80 rounded-xl text-slate-500 text-xs">
+                      No tasks in {col.label.toLowerCase()}
                     </div>
                   )}
                 </div>
@@ -384,225 +516,191 @@ export const TasksPage: React.FC = () => {
         </div>
       ) : (
         /* LIST VIEW */
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between w-full">
-              <CardTitle>Tasks Roster</CardTitle>
-              <span className="text-xs text-slate-500">{filteredTasks.length} tasks</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredTasks.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
-                    <tr>
-                      <th className="px-4 py-3">Task</th>
-                      <th className="px-4 py-3">Goal</th>
-                      <th className="px-4 py-3">Assignee</th>
-                      <th className="px-4 py-3">Priority</th>
-                      <th className="px-4 py-3">Due Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {filteredTasks.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-850/50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleToggleComplete(t)}
-                              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                                t.status === 'COMPLETED'
-                                  ? 'bg-emerald-600 border-emerald-500 text-white'
-                                  : 'border-slate-700 hover:border-emerald-500 text-transparent'
-                              }`}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                            </button>
-                            <span
-                              className={`font-medium ${
-                                t.status === 'COMPLETED' ? 'line-through text-slate-500' : 'text-slate-100'
-                              }`}
-                            >
-                              {t.title}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400 max-w-xs truncate">{t.goalTitle}</td>
-                        <td className="px-4 py-3 text-slate-300">{t.assigneeName}</td>
-                        <td className="px-4 py-3">
-                          <Badge
-                            size="sm"
-                            variant={
-                              t.priority === 'CRITICAL' || t.priority === 'HIGH'
-                                ? 'danger'
-                                : t.priority === 'MEDIUM'
-                                ? 'warning'
-                                : 'default'
-                            }
-                          >
-                            {t.priority}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400">{formatDate(t.dueDate)}</td>
-                        <td className="px-4 py-3">
-                          <Badge size="sm" variant={t.status === 'COMPLETED' ? 'success' : 'primary'}>
-                            {t.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEdit(t)}
-                              title="Edit task"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-rose-400"
-                              onClick={() => setDeletingTaskId(t.id)}
-                              title="Delete task"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyState
-                icon={Filter}
-                title="No tasks found"
-                description="Create actionable development tasks to meet your learning goals."
-                action={
-                  <Button variant="primary" size="sm" onClick={handleOpenCreate}>
-                    Create Task
-                  </Button>
-                }
-              />
-            )}
+        <div className="space-y-2">
+          {filteredTasks.map((t) => {
+            const isCompleted = t.status === 'COMPLETED';
+            const isOverdue =
+              t.dueDate &&
+              !isCompleted &&
+              new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
 
-            {tasksData && tasksData.totalPages > 1 && (
-              <Pagination
-                currentPage={page}
-                totalPages={tasksData.totalPages}
-                totalElements={tasksData.totalElements}
-                onPageChange={setPage}
-              />
-            )}
-          </CardContent>
-        </Card>
+            return (
+              <div
+                key={t.id}
+                className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-4 hover:border-slate-700 transition-all"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    onClick={() => handleToggleTaskStatus(t, isCompleted ? 'TODO' : 'COMPLETED')}
+                    className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                      isCompleted
+                        ? 'bg-emerald-600 border-emerald-500 text-white'
+                        : 'border-slate-700 hover:border-emerald-500 text-transparent'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="min-w-0">
+                    <p
+                      className={`text-xs font-semibold truncate ${
+                        isCompleted ? 'line-through text-slate-500' : 'text-slate-200'
+                      }`}
+                    >
+                      {t.title}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate flex items-center gap-2">
+                      <span>{t.goalTitle}</span>
+                      <span>•</span>
+                      <span>Assignee: {t.assigneeName}</span>
+                      {t.dueDate && (
+                        <>
+                          <span>•</span>
+                          <span className={isOverdue ? 'text-rose-400 font-semibold' : ''}>
+                            Due {formatDate(t.dueDate)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <Badge
+                    size="sm"
+                    variant={
+                      t.status === 'COMPLETED'
+                        ? 'success'
+                        : t.status === 'IN_PROGRESS'
+                        ? 'primary'
+                        : 'default'
+                    }
+                  >
+                    {t.status}
+                  </Badge>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setViewingTask(t)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenEdit(t)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingTaskId(t.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* Create / Edit Task Modal */}
+      {/* Create/Edit Task Modal */}
       <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title={editingTask ? 'Edit Task' : 'Create New Task'}
-        description="Attach this task to a learning goal and assign it to a team member."
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title={editingTask ? 'Edit Task' : 'Create Sprint Task'}
+        description="Assign actionable work tied to learning milestones."
       >
-        <form onSubmit={handleSubmitTask} className="space-y-4">
+        <form onSubmit={handleSaveTask} className="space-y-4">
           <Input
             label="Task Title *"
-            placeholder="e.g. Implement DFS algorithm in Java with unit tests"
-            value={taskTitle}
-            onChange={(e) => setTaskTitle(e.target.value)}
+            placeholder="e.g. Implement binary search tree traversal"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             required
           />
 
           <Input
             label="Description (Optional)"
-            placeholder="e.g. Practice 3 questions on LeetCode"
-            value={taskDescription}
-            onChange={(e) => setTaskDescription(e.target.value)}
+            placeholder="e.g. Include recursive and iterative approaches with unit tests"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
 
-          {!editingTask && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
               label="Associated Goal *"
-              value={goalId}
-              onChange={(e) => setGoalId(e.target.value)}
-              options={
-                goalsData?.content?.map((g) => ({ label: g.title, value: g.id })) || [
-                  { label: 'No goals available', value: '' },
-                ]
-              }
+              value={selectedGoalId}
+              onChange={(e) => setSelectedGoalId(e.target.value)}
+              options={goalsList.map((g) => ({ label: g.title, value: g.id }))}
               required
             />
-          )}
 
-          {!editingTask && (
             <Select
               label="Assignee *"
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              options={users.map((u) => ({ label: `${u.name} (${u.email})`, value: u.id }))}
+              value={selectedAssigneeId}
+              onChange={(e) => setSelectedAssigneeId(e.target.value)}
+              options={users.map((u) => ({ label: u.name, value: u.id }))}
               required
             />
-          )}
+          </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Select
               label="Priority"
-              value={taskPriority}
-              onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TaskPriority)}
               options={[
+                { label: 'Low', value: 'LOW' },
                 { label: 'Medium', value: 'MEDIUM' },
                 { label: 'High', value: 'HIGH' },
                 { label: 'Critical', value: 'CRITICAL' },
-                { label: 'Low', value: 'LOW' },
               ]}
             />
 
             <Select
               label="Status"
-              value={taskStatus}
-              onChange={(e) => setTaskStatus(e.target.value as TaskStatus)}
+              value={status}
+              onChange={(e) => setStatus(e.target.value as TaskStatus)}
               options={[
                 { label: 'To Do', value: 'TODO' },
                 { label: 'In Progress', value: 'IN_PROGRESS' },
                 { label: 'Completed', value: 'COMPLETED' },
-                { label: 'Blocked', value: 'BLOCKED' },
               ]}
             />
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <Input
               type="number"
-              label="Estimated Minutes"
-              min={0}
-              max={1440}
+              label="Est. Minutes"
               value={estimatedMinutes}
               onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
-            />
-
-            <Input
-              type="date"
-              label="Due Date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              min={5}
             />
           </div>
 
+          <Input
+            type="date"
+            label="Due Date (Optional)"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCreateOpen(false)}
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
               size="sm"
-              isLoading={createMutation.isPending || updateMutation.isPending}
+              isLoading={createTaskMutation.isPending || updateTaskMutation.isPending}
             >
               {editingTask ? 'Update Task' : 'Create Task'}
             </Button>
@@ -610,13 +708,101 @@ export const TasksPage: React.FC = () => {
         </form>
       </Modal>
 
+      {/* Task Detail Modal */}
+      {viewingTask && (
+        <Modal
+          isOpen={!!viewingTask}
+          onClose={() => setViewingTask(null)}
+          title={viewingTask.title}
+          description={`Associated with goal: ${viewingTask.goalTitle}`}
+        >
+          <div className="space-y-4 text-xs">
+            {viewingTask.description && (
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">
+                  Description
+                </span>
+                <p className="text-slate-200 whitespace-pre-wrap">{viewingTask.description}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Status</span>
+                <Badge
+                  size="sm"
+                  className="mt-1"
+                  variant={
+                    viewingTask.status === 'COMPLETED'
+                      ? 'success'
+                      : viewingTask.status === 'IN_PROGRESS'
+                      ? 'primary'
+                      : 'default'
+                  }
+                >
+                  {viewingTask.status}
+                </Badge>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Priority</span>
+                <Badge
+                  size="sm"
+                  className="mt-1"
+                  variant={
+                    viewingTask.priority === 'CRITICAL'
+                      ? 'danger'
+                      : viewingTask.priority === 'HIGH'
+                      ? 'warning'
+                      : 'default'
+                  }
+                >
+                  {viewingTask.priority}
+                </Badge>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Assignee</span>
+                <span className="font-semibold text-slate-200 mt-1 block">
+                  {viewingTask.assigneeName}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Due Date</span>
+                <span className="font-semibold text-slate-200 mt-1 block">
+                  {viewingTask.dueDate ? formatDate(viewingTask.dueDate) : 'No deadline'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setViewingTask(null)}>
+                Close
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  const current = viewingTask;
+                  setViewingTask(null);
+                  handleOpenEdit(current);
+                }}
+              >
+                Edit Task
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deletingTaskId && (
         <Modal
           isOpen={!!deletingTaskId}
           onClose={() => setDeletingTaskId(null)}
           title="Delete Task"
-          description="Are you sure you want to delete this task? This will remove it from the active backlog."
+          description="Are you sure you want to delete this task? This action cannot be undone."
         >
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" size="sm" onClick={() => setDeletingTaskId(null)}>
@@ -625,10 +811,10 @@ export const TasksPage: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              isLoading={deleteMutation.isPending}
               onClick={handleDeleteTask}
+              isLoading={deleteTaskMutation.isPending}
             >
-              Delete Task
+              Confirm Delete
             </Button>
           </div>
         </Modal>
