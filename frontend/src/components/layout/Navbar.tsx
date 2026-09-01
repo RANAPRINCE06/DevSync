@@ -6,9 +6,10 @@ import { Link } from 'react-router-dom';
 
 interface NavbarProps {
   onOpenMobileNav: () => void;
+  onOpenCommandPalette: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileNav }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileNav, onOpenCommandPalette }) => {
   const { activeUser, activeTeam, users, teams, setActiveUser, setActiveTeam } = useApp();
   const { data: unreadData } = useUnreadCount(activeUser?.id);
   const unreadCount = unreadData?.unreadCount || 0;
@@ -24,14 +25,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileNav }) => {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="relative w-full max-w-xs hidden sm:block">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search goals, tasks, or team..."
-            className="w-full h-8 pl-9 pr-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500/50 transition-all"
-          />
-        </div>
+        <button
+          onClick={onOpenCommandPalette}
+          className="w-full max-w-xs hidden sm:flex items-center justify-between h-8 px-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-all text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-xs text-slate-400">Search DevSync...</span>
+          </div>
+          <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-800 rounded border border-slate-700">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       {/* Right section: Team switcher, User switcher, Notifications */}
