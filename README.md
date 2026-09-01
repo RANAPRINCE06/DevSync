@@ -4,170 +4,92 @@ DevSync is a private developer accountability and growth platform designed to em
 
 ---
 
-## Implemented Features
+## Architecture & Technology Stack
 
-### Step 1 — Project Foundation
-- Spring Boot 3.4.3 + Java 21 foundation
-- PostgreSQL database configuration with Hikari connection pool
-- In-memory H2 database configuration for testing
-- Database migrations with Flyway (`V1__init_schema.sql`)
-- OpenAPI / Swagger documentation (`/swagger-ui.html`, `/v3/api-docs`)
-- Spring Boot Actuator endpoints (`/actuator/health`)
-- Environment variable configuration via `.env.example`
-- Multi-stage Docker build & Docker Compose setup
+### Backend
+- **Framework**: Spring Boot 3.4.3 (Java 21)
+- **Database**: PostgreSQL with Flyway migrations (`V1` through `V9`)
+- **Testing**: H2 in-memory DB test profile with 151+ unit & WebMvc tests
+- **Documentation**: OpenAPI / Swagger UI (`/swagger-ui.html`, `/v3/api-docs`)
+- **Monitoring**: Spring Boot Actuator (`/actuator/health`)
 
-### Step 2A — Identity & Team Management
-- **User Domain**: `User` entity with UUID primary keys, IANA timezone validation, and active status tracking
-- **Team Domain**: `Team` entity with UUID primary keys and transactional creator `OWNER` role initialization
-- **Team Membership**: Explicit `TeamMember` entity with `TeamRole` enum (`OWNER`, `ADMIN`, `MEMBER`)
-- **Database Migrations**: Flyway migration (`V2__create_user_team_schema.sql`) with UUID columns, unique constraints, and performance indexes
-- **Validation**: Input validation for name length, email format, duplicate detection, and valid IANA ZoneId timezones
-- **Standardized API Response & Exception Handling**: Centralized `ApiResponse<T>` wrapper and `@RestControllerAdvice` exception handler
-
-### Step 2B — Daily Progress & Accountability Domain
-- **Daily Progress Entity**: `DailyProgress` entity mapping `daily_progress` table with `@ManyToOne(fetch = FetchType.LAZY)` links to `User` and `Team`
-- **Progress Status**: Enum `ProgressStatus` (`IN_PROGRESS`, `COMPLETED`, `PARTIAL`)
-- **Database Uniqueness & Indexing**: `UNIQUE(user_id, team_id, progress_date)` constraint enforcing one entry per user/team per date in Flyway migration (`V3__create_daily_progress_schema.sql`)
-- **Business Validation**: Active team membership verification, `studyMinutes` limit (0-1440 mins), max 2000 text length constraints, and date range validation (`fromDate <= toDate`)
-- **Dynamic Paginated Filtering**: Spring Data JPA Specification (`DailyProgressSpecification`) supporting flexible query combinations (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`) with Pageable sorting defaults
-
-### Step 2C — Goals & Task Management Domain
-- **Goal Domain**: `Goal` entity mapping `goals` table with `GoalStatus` (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `ON_HOLD`, `CANCELLED`) and `GoalPriority` (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
-- **Goal Business Rules**: Owner active team membership validation, date range validation (`startDate <= targetDate`), 0-100 progress percentage range, automatic transition to `COMPLETED` when progress reaches 100%, and soft deletion (`active = false`).
-- **Task Domain**: `Task` entity mapping `tasks` table with `TaskStatus` (`TODO`, `IN_PROGRESS`, `COMPLETED`, `BLOCKED`, `CANCELLED`) and `TaskPriority` (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
-- **Task Business Rules**: Direct derivation of Team from Goal, active assignee team membership verification, `dueDate` validation against Goal `startDate`, minute constraints (0-1440), automatic `completedAt` timestamp lifecycle management, and soft deletion (`active = false`).
-- **Database Migrations**: Flyway migrations `V4__create_goals_schema.sql` and `V5__create_tasks_schema.sql` with check constraints and performance indexes.
-- **Dynamic Paginated Filtering**: Spring Data JPA Specifications (`GoalSpecification`, `TaskSpecification`) with Pageable sorting defaults.
-
-### Step 2D — Notification & Reminder Domain
-- **Notification Domain (`com.devsync.notification`)**: `Notification` entity mapping `notifications` table with `NotificationType` (`DAILY_REMINDER`, `GOAL_REMINDER`, `TASK_REMINDER`, `SYSTEM`, `ACHIEVEMENT`) and `NotificationStatus` (`UNREAD`, `READ`).
-- **Notification Business Rules**: Validates user existence, starts as `UNREAD`, records `readAt` upon transition to `READ` (idempotent), batch `markAllAsRead`, count unread notifications, and paginated dynamic filtering.
-- **Reminder Domain (`com.devsync.reminder`)**: `Reminder` entity mapping `reminders` table with `ReminderType` (`DAILY_PROGRESS`, `GOAL`, `TASK`) and `ReminderStatus` (`ACTIVE`, `PAUSED`, `COMPLETED`, `CANCELLED`).
-- **Reminder Business Rules**: Validates user existence, validates team existence and active membership in that team, validates IANA timezone (`ZoneId.of()`), validates date range (`startDate <= endDate`), starts as `ACTIVE` and `active = true`, immutable ownership fields, and soft deletion (`active = false`, `status = CANCELLED`).
-- **Database Migrations**: Flyway migrations `V6__create_notifications_schema.sql` and `V7__create_reminders_schema.sql` with table constraints and performance indexes.
-
-### Step 2E — Achievement, Leaderboard & Coding Profile Domain
-- **Coding Profile Domain (`com.devsync.codingprofile`)**: `CodingProfile` entity mapping `coding_profiles` table with `CodingPlatform` enum (`LEETCODE`, `CODEFORCES`, `CODECHEF`, `HACKERRANK`, `GITHUB`, `OTHER`). Supports rating, problems solved, contests participated, rank, URL validation, duplicate active profile prevention per user/platform, and soft deletion (`active = false`).
-- **Achievement Domain (`com.devsync.achievement`)**: `Achievement` entity mapping `achievements` table with `AchievementType` enum (`STREAK`, `DSA`, `GOAL`, `TASK`, `CODING_PLATFORM`, `TEAM`, `SPECIAL`). Supports point tracking, dynamic filtering, point aggregation, and soft deletion (`active = false`).
-- **Team Leaderboard Domain (`com.devsync.leaderboard`)**: Real-time deterministic score and ranking computation for active team members.
-  - **Deterministic Scoring Rules**:
-    - Daily Progress Entry: `+10` points
-    - Completed Task: `+20` points
-    - Completed Goal: `+50` points
-    - Achievement Points: `+` actual active achievement points
-  - **Deterministic Tie-Breaker Ordering**:
-    1. `score` DESC
-    2. `completedTasks` DESC
-    3. `progressEntries` DESC
-    4. `userName` ASC
-  - **Periods**: `DAILY` (today), `WEEKLY` (Monday to now), `MONTHLY` (1st of month to now), `ALL_TIME` (all records).
-- **Database Migrations**: Flyway migrations `V8__create_coding_profiles_schema.sql` and `V9__create_achievements_schema.sql` with check constraints and performance indexes.
+### Frontend
+- **Framework**: React 18 with TypeScript & Vite
+- **Styling**: Tailwind CSS (Dark theme first, custom palette, slate/violet accents)
+- **Routing**: React Router v7
+- **Server State**: TanStack Query (React Query v5) with optimistic updates and caching
+- **HTTP Client**: Centralized Axios client with standard error interceptors
+- **Icons**: Lucide React
 
 ---
 
-## API Endpoints
+## Implemented Modules
 
-### User APIs (`/api/v1/users`)
-- `POST /api/v1/users` — Create a user profile
-- `GET /api/v1/users/{id}` — Get user profile by UUID
-- `GET /api/v1/users` — Get paginated list of users (`page`, `size`, `sort`)
-- `PUT /api/v1/users/{id}` — Update user name, avatar URL, or timezone
+### Step 1 — Project Foundation
+- Spring Boot 3.4.3 + Java 21 foundation, PostgreSQL database with Hikari pool, Flyway migrations (`V1__init_schema.sql`), Actuator, Swagger/OpenAPI.
 
-### Team APIs (`/api/v1/teams`)
-- `POST /api/v1/teams` — Create a team (assigns creator as `OWNER`)
-- `GET /api/v1/teams/{id}` — Get team by UUID
-- `GET /api/v1/teams` — Get paginated list of teams
-- `PUT /api/v1/teams/{id}` — Update team name or description
-- `POST /api/v1/teams/{teamId}/members/{userId}` — Add a user to a team (`MEMBER` role)
-- `GET /api/v1/teams/{teamId}/members` — Get paginated team members
+### Step 2A — Identity & Team Management
+- `User`, `Team`, and `TeamMember` domains with UUID primary keys, IANA timezone validation, and role authorization (`OWNER`, `ADMIN`, `MEMBER`). Flyway `V2__create_user_team_schema.sql`.
 
-### Daily Progress APIs (`/api/v1/progress`)
-- `POST /api/v1/progress` — Record daily learning & task progress
-- `GET /api/v1/progress/{id}` — Get daily progress entry by UUID
-- `PUT /api/v1/progress/{id}` — Update progress details (what studied, completed, study minutes, status)
-- `GET /api/v1/progress` — Paginated & filtered list (`userId`, `teamId`, `date`, `fromDate`, `toDate`, `status`, `page`, `size`, `sort`)
+### Step 2B — Daily Progress & Accountability
+- `DailyProgress` entity mapping daily learning and task progress with unique `(user_id, team_id, progress_date)` constraints. Flyway `V3__create_daily_progress_schema.sql`.
 
-### Goal APIs (`/api/v1/goals`)
-- `POST /api/v1/goals` — Create a learning/development goal for a team
-- `GET /api/v1/goals/{id}` — Get goal details by UUID
-- `PUT /api/v1/goals/{id}` — Update goal title, description, dates, priority, progress, or status
-- `DELETE /api/v1/goals/{id}` — Soft delete (deactivate) goal
-- `GET /api/v1/goals` — Paginated & filtered list (`ownerId`, `teamId`, `status`, `priority`, `active`, `startDate`, `targetDate`, `page`, `size`, `sort`)
+### Step 2C — Goals & Task Management
+- `Goal` and `Task` domains with status/priority enums, automatic goal completion, and team relationship derivations. Flyway `V4__create_goals_schema.sql` and `V5__create_tasks_schema.sql`.
 
-### Task APIs (`/api/v1/tasks`)
-- `POST /api/v1/tasks` — Create a task under an active goal (team derived automatically)
-- `GET /api/v1/tasks/{id}` — Get task details by UUID
-- `PUT /api/v1/tasks/{id}` — Update task details, priority, due date, status, or actual minutes
-- `DELETE /api/v1/tasks/{id}` — Soft delete (deactivate) task
-- `GET /api/v1/tasks` — Paginated & filtered list (`goalId`, `assigneeId`, `teamId`, `status`, `priority`, `dueDate`, `active`, `page`, `size`, `sort`)
+### Step 2D — Notification & Reminder Domain
+- In-app `Notification` domain with read/unread tracking and batch mark-as-read.
+- Scheduled `Reminder` domain with IANA timezone validation and soft deletion. Flyway `V6` and `V7`.
 
-### Notification APIs (`/api/v1/notifications`)
-- `POST /api/v1/notifications` — Create an in-app notification
-- `GET /api/v1/notifications/{id}` — Get notification details by UUID
-- `GET /api/v1/notifications` — Paginated & filtered list (`userId`, `type`, `status`, `page`, `size`, `sort`)
-- `GET /api/v1/notifications/unread` — Paginated list of unread notifications
-- `GET /api/v1/notifications/unread/count` — Get total unread count for a user
-- `PATCH /api/v1/notifications/{id}/read` — Mark a notification as read (idempotent)
-- `PATCH /api/v1/notifications/read-all` — Mark all unread notifications for a user as read
-- `DELETE /api/v1/notifications/{id}` — Delete notification by UUID
+### Step 2E — Achievement, Leaderboard & Coding Profile Domain
+- `CodingProfile` domain for LeetCode, Codeforces, CodeChef, GitHub, HackerRank.
+- `Achievement` domain with active point aggregation.
+- Real-time `Leaderboard` calculation for `DAILY`, `WEEKLY`, `MONTHLY`, and `ALL_TIME` periods. Flyway `V8` and `V9`.
 
-### Reminder APIs (`/api/v1/reminders`)
-- `POST /api/v1/reminders` — Configure a scheduled reminder
-- `GET /api/v1/reminders/{id}` — Get reminder details by UUID
-- `PUT /api/v1/reminders/{id}` — Update reminder title, message, time, timezone, dates, or status
-- `DELETE /api/v1/reminders/{id}` — Soft delete (deactivate) reminder (`active = false`, `status = CANCELLED`)
-- `GET /api/v1/reminders` — Paginated & filtered list (`userId`, `teamId`, `type`, `status`, `active`, `startDate`, `endDate`, `page`, `size`, `sort`)
-
-### Coding Profile APIs (`/api/v1/coding-profiles`)
-- `POST /api/v1/coding-profiles` — Link a coding profile
-- `GET /api/v1/coding-profiles/{id}` — Get coding profile details by UUID
-- `PUT /api/v1/coding-profiles/{id}` — Update coding profile stats or active state
-- `DELETE /api/v1/coding-profiles/{id}` — Soft delete coding profile (`active = false`)
-- `GET /api/v1/coding-profiles` — Paginated & filtered list (`userId`, `platform`, `active`, `page`, `size`, `sort`)
-- `GET /api/v1/coding-profiles/user/{userId}` — Get all coding profiles for a user
-
-### Achievement APIs (`/api/v1/achievements`)
-- `POST /api/v1/achievements` — Award/create an achievement
-- `GET /api/v1/achievements/{id}` — Get achievement details by UUID
-- `PUT /api/v1/achievements/{id}` — Update achievement title, points, icon, or status
-- `DELETE /api/v1/achievements/{id}` — Soft delete achievement (`active = false`)
-- `GET /api/v1/achievements` — Paginated & filtered list (`userId`, `type`, `active`, `earnedFrom`, `earnedTo`, `page`, `size`, `sort`)
-- `GET /api/v1/achievements/user/{userId}` — Get all achievements for a user
-- `GET /api/v1/achievements/user/{userId}/points` — Get aggregate active achievement points for a user
-
-### Leaderboard APIs (`/api/v1/leaderboard`)
-- `GET /api/v1/leaderboard/teams/{teamId}` — Get ranked leaderboard for a team (`period=DAILY|WEEKLY|MONTHLY|ALL_TIME`, `page`, `size`, `sort`)
-- `GET /api/v1/leaderboard/teams/{teamId}/me/{userId}` — Get specific member ranking and score breakdown in a team
-- `GET /api/v1/leaderboard/teams/{teamId}/period/{period}` — Get leaderboard for explicit period
+### Step 3A — Frontend Foundation
+- **Application Shell**: Modern developer-focused layout with collapsible sidebar, mobile drawer, navbar with workspace/team switcher, user switcher, and notification badges.
+- **Developer Dashboard (`/dashboard`)**: Focus time metrics, active goals summary, upcoming tasks with status badges, team leaderboard top 3 preview, recent badges, and quick-add progress modal.
+- **Typed API Clients & Hooks**: End-to-end typed Axios modules and React Query hooks for all 10 backend domains.
+- **Design System & UI Library**: Custom reusable `Button`, `Card`, `Badge`, `Modal`, `Input`, `Select`, `Skeleton`, `EmptyState`, `Toast`, `Tabs`, and `Pagination` components.
+- **Route Shells**: Foundation routes for `/dashboard`, `/progress`, `/goals`, `/tasks`, `/team`, `/leaderboard`, `/achievements`, `/coding-profiles`, `/notifications`, and `/settings`.
 
 ---
 
 ## Running the Application
 
-### 1. Execute Unit & Integration Tests
+### 1. Backend Setup & Tests
 ```bash
+# Run complete test suite (151 tests)
 ./mvnw clean test
-```
 
-### 2. Local Execution
-Copy `.env.example` to `.env` and set environment variables:
-```bash
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=devsync
-export DB_USERNAME=postgres
-export DB_PASSWORD=your_password
-export SERVER_PORT=8080
-
+# Run Spring Boot backend locally on port 8080
 ./mvnw spring-boot:run
 ```
 
-### 3. Docker Compose Execution
+### 2. Frontend Setup & Execution
 ```bash
-docker-compose up -d
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Copy environment configuration
+cp .env.example .env
+
+# Run Vite development server on http://localhost:5173
+npm run dev
+
+# Build production bundle
+npm run build
+```
+
+### 3. Environment Variables (`frontend/.env`)
+```env
+VITE_API_BASE_URL=http://localhost:8080/api/v1
 ```
 
 ### 4. Interactive API Documentation
 - **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - **OpenAPI Spec**: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
-- **Health Check**: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+- **Actuator Health**: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
