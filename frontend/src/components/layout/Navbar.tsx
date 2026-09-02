@@ -1,248 +1,292 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Bell,
+  Code2,
   Search,
-  Menu,
-  ChevronDown,
+  Bell,
+  Sun,
+  Moon,
   LogOut,
-  Settings,
-  CheckCheck,
+  Users,
+  ChevronDown,
+  LayoutDashboard,
   Calendar,
+  Target,
+  CheckSquare,
+  Trophy,
+  Award,
+  BarChart3,
+  Clock,
+  Settings,
+  PlusCircle,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
-import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useUnreadCount } from '@/hooks/useNotifications';
+import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import { useToast } from '@/contexts/ToastContext';
-import {
-  useUnreadCount,
-  useUnreadNotifications,
-  useMarkAllAsRead,
-} from '@/hooks/useNotifications';
-import { formatDate } from '@/lib/utils';
 
 interface NavbarProps {
-  onOpenMobileNav: () => void;
   onOpenCommandPalette: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileNav, onOpenCommandPalette }) => {
-  const navigate = useNavigate();
+export const Navbar: React.FC<NavbarProps> = ({ onOpenCommandPalette }) => {
   const { user, logout } = useAuth();
-  const { activeTeam, teams, setActiveTeam } = useApp();
+  const { activeTeam, teams, setActiveTeam, createTeam } = useApp();
+  const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-
-  const userMenuRef = useRef<HTMLDivElement>(null);
-  const notifMenuRef = useRef<HTMLDivElement>(null);
-
   const { data: unreadData } = useUnreadCount(user?.id);
-  const { data: unreadNotificationsPage } = useUnreadNotifications({ size: 5 });
-  const markAllMutation = useMarkAllAsRead();
-
   const unreadCount = unreadData?.unreadCount || 0;
-  const unreadList = unreadNotificationsPage?.content || [];
 
-  // Close menus on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target as Node)) {
-        setIsNotificationsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isTeamMenuOpen, setIsTeamMenuOpen] = useState(false);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDesc, setNewTeamDesc] = useState('');
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
 
   const handleLogout = async () => {
     await logout();
-    showToast('info', 'Logged out successfully');
-    navigate('/login', { replace: true });
+    navigate('/login');
   };
 
-  const handleMarkAllRead = async () => {
-    if (!user) return;
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
     try {
-      await markAllMutation.mutateAsync(user.id);
-      showToast('success', 'All notifications marked as read');
-    } catch {
-      showToast('error', 'Failed to mark all as read');
+      setIsCreatingTeam(true);
+      await createTeam(newTeamName.trim(), newTeamDesc.trim() || undefined);
+      showToast('success', 'Team created successfully! You are now the Team Lead.');
+      setIsCreateTeamModalOpen(false);
+      setNewTeamName('');
+      setNewTeamDesc('');
+    } catch (err: unknown) {
+      showToast('error', 'Failed to create team', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsCreatingTeam(false);
     }
   };
 
+  const navLinks = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/progress', label: 'Daily Progress', icon: Calendar },
+    { to: '/goals', label: 'Goals', icon: Target },
+    { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+    { to: '/team', label: 'Team', icon: Users },
+    { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    { to: '/achievements', label: 'Achievements', icon: Award },
+    { to: '/coding-profiles', label: 'Profiles', icon: Code2 },
+    { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { to: '/reminders', label: 'Reminders', icon: Clock },
+    { to: '/notifications', label: 'Alerts', icon: Bell },
+    { to: '/settings', label: 'Settings', icon: Settings },
+  ];
+
   return (
-    <header className="sticky top-0 z-20 h-14 bg-slate-950/80 backdrop-blur-md border-b border-slate-850 px-4 md:px-8 flex items-center justify-between gap-4">
-      {/* Left section: mobile hamburger & search */}
-      <div className="flex items-center gap-3 flex-1 max-w-md">
-        <button
-          onClick={onOpenMobileNav}
-          className="md:hidden p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-850"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+    <header className="border-b border-[#1e3a8a] bg-[#1e3a8a] text-white shadow-xs sticky top-0 z-40">
+      {/* 1. Main Top Header Bar */}
+      <div className="max-w-7xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
+        {/* Logo & Portal Identity */}
+        <div className="flex items-center gap-3">
+          <NavLink to="/dashboard" className="flex items-center gap-2 text-white font-bold text-sm tracking-wide">
+            <div className="w-7 h-7 rounded-[2px] bg-white text-[#1e3a8a] flex items-center justify-center font-black text-xs shadow-xs">
+              DS
+            </div>
+            <div className="leading-tight">
+              <span className="font-extrabold text-sm block">DEVSYNC</span>
+              <span className="text-[9px] uppercase tracking-widest text-blue-200 block">Developer Portal</span>
+            </div>
+          </NavLink>
 
-        <button
-          onClick={onOpenCommandPalette}
-          className="w-full max-w-xs hidden sm:flex items-center justify-between h-8 px-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-all text-left"
-        >
-          <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-xs text-slate-400">Search DevSync...</span>
-          </div>
-          <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-800 rounded border border-slate-700">
-            ⌘K
-          </kbd>
-        </button>
-      </div>
-
-      {/* Right section: Team switcher, Notifications, User Menu */}
-      <div className="flex items-center gap-3">
-        {/* Team switcher dropdown */}
-        {teams.length > 0 && (
-          <div className="relative">
-            <select
-              value={activeTeam?.id || ''}
-              onChange={(e) => {
-                const found = teams.find((t) => t.id === e.target.value);
-                if (found) setActiveTeam(found);
-              }}
-              className="h-8 pl-2.5 pr-8 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary-500/50 appearance-none cursor-pointer"
+          {/* Team Selector Dropdown */}
+          <div className="relative hidden md:block">
+            <button
+              onClick={() => setIsTeamMenuOpen(!isTeamMenuOpen)}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-[#1e40af] hover:bg-[#1d4ed8] border border-blue-400/40 rounded-[2px] text-xs font-medium text-white transition-colors"
             >
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        )}
+              <Users className="w-3.5 h-3.5 text-blue-200" />
+              <span className="max-w-[140px] truncate">{activeTeam?.name || 'Select Team'}</span>
+              <ChevronDown className="w-3 h-3 text-blue-200" />
+            </button>
 
-        {/* Notifications Bell with Popover */}
-        <div className="relative" ref={notifMenuRef}>
+            {isTeamMenuOpen && (
+              <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-700 rounded-[2px] shadow-lg py-1 z-50 text-slate-800 dark:text-slate-200 text-xs">
+                <div className="px-3 py-1 font-bold text-[10px] uppercase text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                  Switch Team Workspace
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {teams.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setActiveTeam(t);
+                        setIsTeamMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center justify-between ${
+                        activeTeam?.id === t.id ? 'font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50' : ''
+                      }`}
+                    >
+                      <span className="truncate">{t.name}</span>
+                      {activeTeam?.id === t.id && <span className="text-[10px] text-blue-600">Active</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 dark:border-slate-800 p-1.5">
+                  <button
+                    onClick={() => {
+                      setIsTeamMenuOpen(false);
+                      setIsCreateTeamModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-1 text-xs bg-[#f1f5f9] hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 font-semibold rounded-[2px]"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 text-blue-600" />
+                    Create New Team
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section: Search, Notifications, Theme, User */}
+        <div className="flex items-center gap-2">
+          {/* Quick Search */}
           <button
-            onClick={() => setIsNotificationsOpen((prev) => !prev)}
-            className="relative p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all"
+            onClick={onOpenCommandPalette}
+            className="flex items-center gap-2 px-2.5 py-1 bg-[#1e40af] hover:bg-[#1d4ed8] border border-blue-400/40 rounded-[2px] text-xs text-blue-100 transition-colors"
+            title="Search or press Ctrl+K"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-[11px]">Quick Search</span>
+            <kbd className="hidden sm:inline bg-[#1e3a8a] text-[10px] px-1 rounded border border-blue-400/50 font-mono">
+              Ctrl+K
+            </kbd>
+          </button>
+
+          {/* Notifications */}
+          <NavLink
+            to="/notifications"
+            className="relative p-1.5 bg-[#1e40af] hover:bg-[#1d4ed8] rounded-[2px] text-white border border-blue-400/40 transition-colors"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary-500 ring-2 ring-slate-950 animate-pulse" />
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold px-1 rounded-full border border-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             )}
-          </button>
+          </NavLink>
 
-          {/* Popover */}
-          {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-3 z-30 animate-in zoom-in-95 duration-150 space-y-2">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-100">Notifications</span>
-                  {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-primary-500/20 text-primary-300 text-[10px] font-bold border border-primary-500/30">
-                      {unreadCount} new
-                    </span>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    disabled={markAllMutation.isPending}
-                    className="text-[11px] text-primary-400 hover:text-primary-300 flex items-center gap-1 font-medium transition-colors"
-                  >
-                    <CheckCheck className="w-3 h-3" /> Mark all read
-                  </button>
-                )}
-              </div>
-
-              {/* Notification items list */}
-              <div className="space-y-1 max-h-64 overflow-y-auto">
-                {unreadList.length > 0 ? (
-                  unreadList.map((n) => (
-                    <div
-                      key={n.id}
-                      className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-all space-y-0.5"
-                    >
-                      <p className="text-xs font-semibold text-slate-100 truncate">{n.title}</p>
-                      <p className="text-[11px] text-slate-400 line-clamp-2">{n.message}</p>
-                      <span className="text-[9px] text-slate-500 block pt-0.5 flex items-center gap-1">
-                        <Calendar className="w-2.5 h-2.5" />
-                        {formatDate(n.createdAt)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-xs text-slate-500">
-                    No unread notifications!
-                  </div>
-                )}
-              </div>
-
-              {/* Footer link */}
-              <div className="pt-2 border-t border-slate-800 text-center">
-                <Link
-                  to="/notifications"
-                  onClick={() => setIsNotificationsOpen(false)}
-                  className="text-xs font-medium text-primary-400 hover:text-primary-300 transition-colors"
-                >
-                  View all notifications →
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* User Session Dropdown */}
-        <div className="relative" ref={userMenuRef}>
+          {/* Theme Toggle */}
           <button
-            onClick={() => setIsUserMenuOpen((prev) => !prev)}
-            className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-1.5 bg-[#1e40af] hover:bg-[#1d4ed8] rounded-[2px] text-white border border-blue-400/40 transition-colors"
+            title="Toggle theme"
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xs shadow-sm shrink-0">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </div>
-            <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-semibold text-slate-200 leading-tight">
-                {user?.name || 'Developer'}
-              </span>
-              <span className="text-[10px] text-slate-500 leading-tight truncate max-w-[120px]">
-                {user?.email || 'dev@devsync.io'}
-              </span>
-            </div>
-            <ChevronDown className="w-3 h-3 text-slate-500" />
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-blue-200" />}
           </button>
 
-          {/* User Menu Popover */}
-          {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-1.5 z-30 animate-in zoom-in-95 duration-150 space-y-1">
-              <div className="px-3 py-2 border-b border-slate-800">
-                <p className="text-xs font-bold text-slate-100 truncate">{user?.name}</p>
-                <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+          {/* User Profile Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-1.5 px-2 py-1 bg-[#1e40af] hover:bg-[#1d4ed8] border border-blue-400/40 rounded-[2px] text-xs text-white transition-colors"
+            >
+              <div className="w-5 h-5 rounded-[2px] bg-white text-[#1e3a8a] flex items-center justify-center font-bold text-[10px]">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
+              <span className="hidden md:inline font-semibold max-w-[100px] truncate">{user?.name || 'User'}</span>
+              <ChevronDown className="w-3 h-3 text-blue-200" />
+            </button>
 
-              <Link
-                to="/settings"
-                onClick={() => setIsUserMenuOpen(false)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-              >
-                <Settings className="w-3.5 h-3.5 text-slate-400" />
-                <span>Settings</span>
-              </Link>
-
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 transition-colors text-left"
-              >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span>Log Out</span>
-              </button>
-            </div>
-          )}
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-1 w-52 bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-700 rounded-[2px] shadow-lg py-1 z-50 text-slate-800 dark:text-slate-200 text-xs">
+                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800">
+                  <div className="font-bold text-slate-900 dark:text-slate-100">{user?.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{user?.email}</div>
+                </div>
+                <NavLink
+                  to="/settings"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                >
+                  <Settings className="w-3.5 h-3.5 text-slate-500" />
+                  Account Settings
+                </NavLink>
+                <div className="border-t border-slate-200 dark:border-slate-800 my-1" />
+                <button
+                  handle-event="logout"
+                  onClick={handleLogout}
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 flex items-center gap-2 font-medium"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* 2. Classic Horizontal Navigation Menu Bar */}
+      <nav className="bg-[#1e40af] border-t border-blue-600/40 px-4 overflow-x-auto">
+        <div className="max-w-7xl mx-auto flex items-center gap-1 text-xs">
+          {navLinks.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `px-3 py-2 flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors border-b-2 ${
+                  isActive
+                    ? 'bg-white/10 text-white border-white font-bold'
+                    : 'text-blue-100 hover:text-white hover:bg-white/5 border-transparent'
+                }`
+              }
+            >
+              <item.icon className="w-3.5 h-3.5 opacity-80" />
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      {/* Create Team Modal */}
+      <Modal
+        isOpen={isCreateTeamModalOpen}
+        onClose={() => setIsCreateTeamModalOpen(false)}
+        title="Create Team Workspace"
+        description="Start a new team accountability workspace. You will automatically become the Team Lead."
+      >
+        <form onSubmit={handleCreateTeam} className="space-y-3">
+          <Input
+            label="Team Name *"
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
+            placeholder="e.g. Core Engineering Team"
+            required
+          />
+          <Input
+            label="Description (Optional)"
+            value={newTeamDesc}
+            onChange={(e) => setNewTeamDesc(e.target.value)}
+            placeholder="e.g. Daily sprint tracking & backend mastery"
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateTeamModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" size="sm" isLoading={isCreatingTeam}>
+              Create Team & Become Lead
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </header>
   );
 };

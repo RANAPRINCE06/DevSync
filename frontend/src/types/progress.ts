@@ -9,7 +9,11 @@ export interface DailyProgress {
   teamName: string;
   progressDate: string;
   whatStudied: string;
+  completed: string;
   whatCompleted?: string | null;
+  challenges?: string | null;
+  improvementAreas?: string | null;
+  tomorrowPlan?: string | null;
   blockers?: string | null;
   studyMinutes: number;
   status: ProgressStatus;
@@ -22,7 +26,11 @@ export interface CreateDailyProgressRequest {
   teamId: string;
   progressDate: string;
   whatStudied: string;
+  completed?: string;
   whatCompleted?: string;
+  challenges?: string;
+  improvementAreas?: string;
+  tomorrowPlan?: string;
   blockers?: string;
   studyMinutes: number;
   status: ProgressStatus;
@@ -30,7 +38,11 @@ export interface CreateDailyProgressRequest {
 
 export interface UpdateDailyProgressRequest {
   whatStudied: string;
+  completed?: string;
   whatCompleted?: string;
+  challenges?: string;
+  improvementAreas?: string;
+  tomorrowPlan?: string;
   blockers?: string;
   studyMinutes: number;
   status: ProgressStatus;

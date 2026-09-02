@@ -1,209 +1,183 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trophy } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Tabs } from '@/components/ui/Tabs';
+import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Pagination } from '@/components/ui/Pagination';
-import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { LeaderboardPeriod } from '@/types/leaderboard';
+import { filterRealUsers } from '@/lib/userFilter';
 
 export const LeaderboardPage: React.FC = () => {
-  const { activeUser, activeTeam } = useApp();
+  const { activeTeam, activeUser } = useApp();
   const [period, setPeriod] = useState<LeaderboardPeriod>('ALL_TIME');
-  const [page, setPage] = useState(0);
 
-  const { data: leaderboardData, isLoading } = useLeaderboard(activeTeam?.id, period, {
-    page,
-    size: 20,
-    sort: 'score,desc',
-  });
+  const { data: leaderboardPage, isLoading } = useLeaderboard(activeTeam?.id, period, { size: 1000 });
 
-  const periodTabs = [
-    { id: 'DAILY', label: 'Today' },
-    { id: 'WEEKLY', label: 'This Week' },
-    { id: 'MONTHLY', label: 'This Month' },
-    { id: 'ALL_TIME', label: 'All Time' },
+  const rawEntries = leaderboardPage?.content || [];
+  // Strictly filter out internal system/admin accounts
+  const entries = useMemo(() => filterRealUsers(rawEntries), [rawEntries]);
+
+  const periods: { value: LeaderboardPeriod; label: string }[] = [
+    { value: 'ALL_TIME', label: 'All-Time' },
+    { value: 'MONTHLY', label: 'This Month' },
+    { value: 'WEEKLY', label: 'This Week' },
+    { value: 'DAILY', label: 'Today' },
   ];
 
-  const top3 = leaderboardData?.content?.slice(0, 3) || [];
-  const entries = leaderboardData?.content || [];
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-4">
       {/* 1. Header & Period Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            Team Leaderboard & Standings
+          <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            Team Standings & Scoring Leaderboard
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Real-time rankings based on daily consistency, task execution, and milestone achievements.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Team: <span className="font-semibold text-slate-700 dark:text-slate-200">{activeTeam?.name || 'Developer Workspace'}</span> • +10 pts Daily Progress, +20 pts Task, +50 pts Goal
           </p>
         </div>
 
-        <Tabs
-          tabs={periodTabs}
-          activeTab={period}
-          onChange={(tabId) => {
-            setPeriod(tabId as LeaderboardPeriod);
-            setPage(0);
-          }}
-        />
+        {/* Period Selector */}
+        <div className="flex border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] overflow-hidden">
+          {periods.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => setPeriod(p.value)}
+              className={`px-3 py-1 text-xs font-semibold ${
+                period === p.value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 2. Top-3 Podium Display */}
-      {top3.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-          {top3.map((entry) => {
-            const medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉';
-            const isFirst = entry.rank === 1;
-            const isCurrentUser = activeUser && entry.userId === activeUser.id;
+      {/* 2. Top 3 Standings Highlight Boxes */}
+      {entries.length >= 3 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Rank 2 */}
+          <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                🥈 2nd Place
+              </span>
+              <Badge size="sm" variant="default">
+                {entries[1].score} pts
+              </Badge>
+            </div>
+            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 mt-2">{entries[1].userName}</div>
+            <div className="text-[11px] text-slate-500">{entries[1].completedTasks} tasks • {entries[1].completedGoals} goals</div>
+          </div>
 
-            return (
-              <Card
-                key={entry.userId}
-                className={`flex flex-col items-center text-center p-5 relative overflow-hidden transition-all ${
-                  isFirst
-                    ? 'bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/50 shadow-glow sm:-translate-y-2'
-                    : 'bg-slate-900/80 border-slate-800'
-                } ${isCurrentUser ? 'ring-2 ring-primary-500/50' : ''}`}
-              >
-                <span className="text-4xl mb-2">{medal}</span>
-                <span className="text-sm font-bold text-slate-100 truncate max-w-full">
-                  {entry.userName}
-                </span>
-                <span className="text-2xl font-extrabold text-primary-300 mt-1">
-                  {entry.score} <span className="text-xs font-normal text-slate-400">pts</span>
-                </span>
+          {/* Rank 1 */}
+          <div className="bg-white dark:bg-slate-900 border-2 border-amber-400 dark:border-amber-500 p-3 rounded-[3px] bg-amber-50/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                🥇 1st Place (Leader)
+              </span>
+              <Badge size="sm" variant="warning">
+                {entries[0].score} pts
+              </Badge>
+            </div>
+            <div className="font-bold text-base text-slate-900 dark:text-slate-100 mt-2">{entries[0].userName}</div>
+            <div className="text-[11px] text-slate-500">{entries[0].completedTasks} tasks • {entries[0].completedGoals} goals</div>
+          </div>
 
-                <div className="w-full grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800/80 text-[10px] text-slate-400">
-                  <div>
-                    <span className="block font-bold text-slate-200">{entry.completedTasks}</span>
-                    <span>Tasks</span>
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200">{entry.progressEntries}</span>
-                    <span>Logs</span>
-                  </div>
-                  <div>
-                    <span className="block font-bold text-slate-200">{entry.achievementPoints}</span>
-                    <span>Badges</span>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+          {/* Rank 3 */}
+          <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                🥉 3rd Place
+              </span>
+              <Badge size="sm" variant="default">
+                {entries[2].score} pts
+              </Badge>
+            </div>
+            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 mt-2">{entries[2].userName}</div>
+            <div className="text-[11px] text-slate-500">{entries[2].completedTasks} tasks • {entries[2].completedGoals} goals</div>
+          </div>
         </div>
       )}
 
-      {/* 3. Score Breakdown Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-primary-950 border border-primary-800 flex items-center justify-center text-primary-400 font-bold text-xs">
-            +10
-          </div>
-          <div className="text-[11px]">
-            <span className="font-semibold text-slate-200 block">Daily Progress</span>
-            <span className="text-slate-500">Per verified log</span>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400 font-bold text-xs">
-            +20
-          </div>
-          <div className="text-[11px]">
-            <span className="font-semibold text-slate-200 block">Completed Task</span>
-            <span className="text-slate-500">Per sprint item</span>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400 font-bold text-xs">
-            +50
-          </div>
-          <div className="text-[11px]">
-            <span className="font-semibold text-slate-200 block">Completed Goal</span>
-            <span className="text-slate-500">100% milestone</span>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-amber-950 border border-amber-800 flex items-center justify-center text-amber-400 font-bold text-xs">
-            +pts
-          </div>
-          <div className="text-[11px]">
-            <span className="font-semibold text-slate-200 block">Achievements</span>
-            <span className="text-slate-500">Badge point value</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Full Ranked Leaderboard Table */}
+      {/* 3. Standings Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between w-full">
-            <CardTitle>Complete Standings</CardTitle>
-            <span className="text-xs text-slate-500">{entries.length} active members</span>
-          </div>
+          <CardTitle>Team Member Rankings</CardTitle>
+          <span className="text-[11px] text-slate-500">{entries.length} Engineers Ranked</span>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
+            <div className="p-4 space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
             </div>
           ) : entries.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+              <table className="classic-table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3 w-16 text-center">Rank</th>
-                    <th className="px-4 py-3">Developer</th>
-                    <th className="px-4 py-3">Tasks Completed (+20)</th>
-                    <th className="px-4 py-3">Progress Logs (+10)</th>
-                    <th className="px-4 py-3">Goals (+50)</th>
-                    <th className="px-4 py-3">Achievement Points</th>
-                    <th className="px-4 py-3 text-right">Total Score</th>
+                    <th style={{ width: '60px' }}>Rank</th>
+                    <th>Engineer</th>
+                    <th>Tasks Completed</th>
+                    <th>Goals Completed</th>
+                    <th>Progress Logs</th>
+                    <th>Badges Points</th>
+                    <th className="text-right">Total Score</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {entries.map((entry) => {
-                    const isCurrentUser = activeUser && entry.userId === activeUser.id;
-                    const medalEmoji =
-                      entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`;
-
+                <tbody>
+                  {entries.map((item, idx) => {
+                    const isCurrentUser = activeUser && item.userId === activeUser.id;
                     return (
                       <tr
-                        key={entry.userId}
-                        className={`transition-colors ${
-                          isCurrentUser ? 'bg-primary-950/20 font-medium' : 'hover:bg-slate-850/50'
-                        }`}
+                        key={item.userId}
+                        className={isCurrentUser ? 'bg-blue-50/70 dark:bg-blue-950/30 font-semibold' : ''}
                       >
-                        <td className="px-4 py-3 text-center text-sm font-bold text-slate-200">
-                          {medalEmoji}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-100">{entry.userName}</span>
-                            {isCurrentUser && (
-                              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500/20 text-primary-300 font-bold border border-primary-500/30">
-                                You
-                              </span>
+                        <td>
+                          <div className="flex items-center gap-1">
+                            {idx === 0 ? (
+                              <span className="text-amber-500 font-bold">🥇 1</span>
+                            ) : idx === 1 ? (
+                              <span className="text-slate-500 font-bold">🥈 2</span>
+                            ) : idx === 2 ? (
+                              <span className="text-amber-700 font-bold">🥉 3</span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-[11px]">#{idx + 1}</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-300">{entry.completedTasks}</td>
-                        <td className="px-4 py-3 text-slate-300">{entry.progressEntries}</td>
-                        <td className="px-4 py-3 text-slate-300">{entry.completedGoals}</td>
-                        <td className="px-4 py-3 text-amber-400 font-medium">
-                          {entry.achievementPoints} pts
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">{item.userName}</span>
+                            {isCurrentUser && (
+                              <Badge size="sm" variant="primary">
+                                YOU
+                              </Badge>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-right font-extrabold text-primary-300 text-sm">
-                          {entry.score}
+                        <td className="text-slate-700 dark:text-slate-300">
+                          {item.completedTasks || 0}
+                        </td>
+                        <td className="text-slate-700 dark:text-slate-300">
+                          {item.completedGoals || 0}
+                        </td>
+                        <td className="text-slate-700 dark:text-slate-300">
+                          {item.progressEntries || 0}
+                        </td>
+                        <td className="text-slate-700 dark:text-slate-300">
+                          {item.achievementPoints || 0} pts
+                        </td>
+                        <td className="text-right">
+                          <span className="font-bold text-blue-700 dark:text-blue-400 text-sm">
+                            {item.score} <span className="text-xs font-normal text-slate-400">pts</span>
+                          </span>
                         </td>
                       </tr>
                     );
@@ -212,20 +186,13 @@ export const LeaderboardPage: React.FC = () => {
               </table>
             </div>
           ) : (
-            <EmptyState
-              icon={Trophy}
-              title="No leaderboard data"
-              description="Start submitting progress and completing tasks to see rankings."
-            />
-          )}
-
-          {leaderboardData && leaderboardData.totalPages > 1 && (
-            <Pagination
-              currentPage={page}
-              totalPages={leaderboardData.totalPages}
-              totalElements={leaderboardData.totalElements}
-              onPageChange={setPage}
-            />
+            <div className="p-6">
+              <EmptyState
+                icon={Trophy}
+                title="No leaderboard standings recorded"
+                description="Log daily progress or complete sprint tasks to start ranking on the team leaderboard."
+              />
+            </div>
           )}
         </CardContent>
       </Card>

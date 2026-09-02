@@ -1,71 +1,68 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Users,
+  Plus,
   UserPlus,
-  Crown,
-  ShieldCheck,
-  UserCheck,
-  Activity,
-  Sparkles,
-  CheckCircle2,
-  Calendar,
-  Search,
   Mail,
-  Eye,
+  Crown,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useTeamMembers, useAddTeamMember } from '@/hooks/useTeams';
-import { useGoals } from '@/hooks/useGoals';
-import { useTasks } from '@/hooks/useTasks';
+import {
+  useTeamMembers,
+  useAddTeamMember,
+} from '@/hooks/useTeams';
 import { formatDate } from '@/lib/utils';
 import { TeamMember } from '@/types/team';
+import { filterRealTeamMembers, filterRealUsers } from '@/lib/userFilter';
 
 export const TeamPage: React.FC = () => {
-  const { activeTeam, users } = useApp();
+  const { activeTeam, teams, users, createTeam } = useApp();
+  const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('ALL');
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+
+  // Add Member State
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [viewingMember, setViewingMember] = useState<TeamMember | null>(null);
 
-  const { data: membersPage, isLoading: isMembersLoading } = useTeamMembers(activeTeam?.id, { size: 50 });
-  const { data: goalsPage } = useGoals({ teamId: activeTeam?.id, active: true, size: 50 });
-  const { data: tasksPage } = useTasks({ teamId: activeTeam?.id, active: true, size: 50 });
+  // Create Team State
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDescription, setNewTeamDescription] = useState('');
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
 
+  const { data: rawMembersPage, isLoading: isMembersLoading } = useTeamMembers(activeTeam?.id, { size: 1000 });
   const addMemberMutation = useAddTeamMember();
 
-  const allMembers = membersPage?.content || [];
-  const existingMemberUserIds = new Set(allMembers.map((m) => m.userId));
-  const availableUsersToInvite = users.filter((u) => !existingMemberUserIds.has(u.id));
+  const rawMembers = rawMembersPage?.content || [];
 
-  // Filtered members list
-  const filteredMembers = useMemo(() => {
-    return allMembers.filter((m) => {
-      const matchesSearch =
-        m.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.userEmail.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = roleFilter === 'ALL' || m.role === roleFilter;
-      return matchesSearch && matchesRole;
-    });
-  }, [allMembers, searchQuery, roleFilter]);
+  // Strictly filter out internal system/admin accounts
+  const realMembers = filterRealTeamMembers(rawMembers);
+  const realUsers = filterRealUsers(users);
+
+  // Available users to add who are not already in this team
+  const availableUsersToAdd = realUsers.filter(
+    (u) => !realMembers.some((m) => m.userId === u.id)
+  );
+
+  // Identify Team Lead / Owner
+  const teamLead =
+    realMembers.find((m) => m.role === 'OWNER' || m.role === 'ADMIN') ||
+    (realMembers.length > 0 ? realMembers[0] : null);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTeam) {
-      showToast('error', 'No active team selected');
-      return;
-    }
-    if (!selectedUserId) {
+    if (!activeTeam || !selectedUserId) {
       showToast('warning', 'Please select a user to add');
       return;
     }
@@ -75,318 +72,293 @@ export const TeamPage: React.FC = () => {
         teamId: activeTeam.id,
         userId: selectedUserId,
       });
-      showToast('success', 'Member added to team successfully!');
-      setIsInviteModalOpen(false);
+      showToast('success', 'Team member added successfully!');
+      setIsAddMemberModalOpen(false);
       setSelectedUserId('');
     } catch (err: unknown) {
-      showToast('error', 'Failed to add team member', err instanceof Error ? err.message : 'Unknown error');
+      showToast('error', 'Failed to add member', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const totalMembers = membersPage?.totalElements || 0;
-  const totalGoals = goalsPage?.totalElements || 0;
-  const completedTasks = tasksPage?.content?.filter((t) => t.status === 'COMPLETED').length || 0;
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+
+    try {
+      setIsCreatingTeam(true);
+      await createTeam(newTeamName.trim(), newTeamDescription.trim() || undefined);
+      showToast('success', 'Team created successfully! You are now the Team Lead.');
+      setIsCreateTeamModalOpen(false);
+      setNewTeamName('');
+      setNewTeamDescription('');
+    } catch (err: unknown) {
+      showToast('error', 'Failed to create team', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsCreatingTeam(false);
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Team Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
+    <div className="space-y-4">
+      {/* 1. Header Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Users className="w-5 h-5 text-sky-400" />
-            {activeTeam?.name || 'Developer Team'}
+          <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Users className="w-4 h-4 text-blue-600" />
+            {activeTeam?.name || 'Developer Team Workspace'}
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {activeTeam?.description || 'Team workspace for daily accountability and group growth.'}
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {activeTeam?.description || 'Collaborative engineering squad synchronization'} • Total Members: <span className="font-bold text-slate-800 dark:text-slate-200">{realMembers.length}</span>
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<UserPlus className="w-4 h-4" />}
-          onClick={() => {
-            setSelectedUserId(availableUsersToInvite[0]?.id || '');
-            setIsInviteModalOpen(true);
-          }}
-        >
-          Add Member
-        </Button>
-      </div>
-
-      {/* 2. Team Overview Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Total Members</span>
-            <Users className="w-4 h-4 text-sky-400" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">{totalMembers}</div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Active engineers in workspace</p>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Active Goals</span>
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">{totalGoals}</div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Shared learning objectives</p>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Completed Tasks</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">{completedTasks}</div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Sprint tasks completed</p>
-        </Card>
-      </div>
-
-      {/* 3. Member Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
-        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-md">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search team members by name or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
-
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Plus className="w-3.5 h-3.5 text-blue-600" />}
+            onClick={() => setIsCreateTeamModalOpen(true)}
           >
-            <option value="ALL">All Roles</option>
-            <option value="OWNER">Owner</option>
-            <option value="ADMIN">Admin</option>
-            <option value="MEMBER">Member</option>
-          </select>
+            Create New Team
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<UserPlus className="w-3.5 h-3.5" />}
+            onClick={() => {
+              if (availableUsersToAdd.length === 0) {
+                showToast('info', 'All registered developers are already members of this team.');
+              }
+              setSelectedUserId(availableUsersToAdd[0]?.id || '');
+              setIsAddMemberModalOpen(true);
+            }}
+          >
+            Add Member
+          </Button>
         </div>
       </div>
 
-      {/* 4. Team Member Roster */}
+      {/* 2. Team Lead & Leadership Banner */}
+      <div className="bg-white dark:bg-slate-900 border-2 border-blue-600/60 dark:border-blue-500/60 rounded-[3px] p-3.5 shadow-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+            <Crown className="w-3.5 h-3.5 text-amber-500" />
+            Designated Team Lead / Workspace Owner
+          </span>
+          <Badge size="sm" variant="primary">
+            TEAM LEAD
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-3 mt-2.5">
+          <div className="w-10 h-10 rounded-[2px] bg-blue-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+            {teamLead?.userName?.charAt(0).toUpperCase() || user?.name?.charAt(0).toUpperCase() || 'L'}
+          </div>
+          <div>
+            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              {teamLead?.userName || user?.name || 'Workspace Creator'}
+              {teamLead?.userId === user?.id && (
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-1.5 py-0.2 rounded-[2px] border border-emerald-300">
+                  YOU
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+              <Mail className="w-3 h-3" />
+              {teamLead?.userEmail || user?.email || 'admin@workspace'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Team Member Roster Data Table (Unlimited list) */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between w-full">
-            <CardTitle>Member Directory</CardTitle>
-            <span className="text-xs text-slate-500">{filteredMembers.length} members</span>
-          </div>
+          <CardTitle>Team Member Roster</CardTitle>
+          <span className="text-[11px] text-slate-500">{realMembers.length} Active Members</span>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isMembersLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
+            <div className="p-4 space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
             </div>
-          ) : filteredMembers.length > 0 ? (
+          ) : realMembers.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+              <table className="classic-table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3">Member</th>
-                    <th className="px-4 py-3">Email</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Joined Date</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th style={{ width: '40px' }}>#</th>
+                    <th>Developer Name</th>
+                    <th>Email Address</th>
+                    <th>Team Role</th>
+                    <th>Joined Workspace</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {filteredMembers.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-850/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                            {m.userName.charAt(0).toUpperCase()}
+                <tbody>
+                  {realMembers.map((member: TeamMember, idx: number) => {
+                    const isSelf = user && member.userId === user.id;
+                    const isOwner = member.role === 'OWNER';
+                    return (
+                      <tr key={member.id || member.userId} className={isSelf ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}>
+                        <td className="text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-[2px] bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center justify-center font-bold text-[10px]">
+                              {member.userName?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">{member.userName}</span>
+                            {isSelf && (
+                              <Badge size="sm" variant="primary">
+                                YOU
+                              </Badge>
+                            )}
                           </div>
-                          <span className="font-semibold text-slate-100">{m.userName}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-400">{m.userEmail}</td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          size="sm"
-                          variant={
-                            m.role === 'OWNER'
-                              ? 'warning'
-                              : m.role === 'ADMIN'
-                              ? 'primary'
-                              : 'default'
-                          }
-                          className="flex items-center gap-1 w-fit"
-                        >
-                          {m.role === 'OWNER' && <Crown className="w-3 h-3 text-amber-400" />}
-                          {m.role === 'ADMIN' && <ShieldCheck className="w-3 h-3 text-primary-400" />}
-                          {m.role === 'MEMBER' && <UserCheck className="w-3 h-3 text-slate-400" />}
-                          {m.role}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-slate-400">{formatDate(m.joinedAt)}</td>
-                      <td className="px-4 py-3">
-                        <Badge size="sm" variant={m.active ? 'success' : 'danger'}>
-                          {m.active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setViewingMember(m)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-                          title="View member card"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="text-slate-600 dark:text-slate-400">{member.userEmail}</td>
+                        <td>
+                          <Badge
+                            size="sm"
+                            variant={isOwner ? 'warning' : member.role === 'ADMIN' ? 'primary' : 'default'}
+                          >
+                            {isOwner ? 'LEAD / OWNER' : member.role}
+                          </Badge>
+                        </td>
+                        <td className="text-slate-500 text-[11px]">{formatDate(member.joinedAt)}</td>
+                        <td>
+                          <Badge size="sm" variant={member.active ? 'success' : 'danger'}>
+                            {member.active ? 'ACTIVE' : 'INACTIVE'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
-            <EmptyState
-              icon={Users}
-              title="No team members found"
-              description="Invite other developers to your team to start daily synchronization."
-              action={
-                <Button variant="primary" size="sm" onClick={() => setIsInviteModalOpen(true)}>
-                  Add Member
-                </Button>
-              }
-            />
+            <div className="p-6">
+              <EmptyState
+                icon={Users}
+                title="No team members in workspace"
+                description="Add developers from your organization to collaborate on shared goals and tasks."
+                action={
+                  <Button variant="primary" size="sm" onClick={() => setIsAddMemberModalOpen(true)}>
+                    Add First Member
+                  </Button>
+                }
+              />
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 5. Team Activity Stream */}
+      {/* 4. Available Team Workspaces Switcher Panel */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-400" />
-            <CardTitle>Team Activity Stream</CardTitle>
-          </div>
+          <CardTitle>Available Team Workspaces</CardTitle>
+          <span className="text-[11px] text-slate-500">{teams.length} Workspaces</span>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {tasksPage?.content?.slice(0, 4).map((t) => (
+        <CardContent className="p-0">
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {teams.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 text-xs"
+                className={`p-3 flex items-center justify-between text-xs transition-colors ${
+                  activeTeam?.id === t.id ? 'bg-blue-50/50 dark:bg-blue-950/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-950 border border-emerald-800/60 flex items-center justify-center text-emerald-400 shrink-0">
-                    ✓
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{t.name}</span>
+                    {activeTeam?.id === t.id && (
+                      <Badge size="sm" variant="primary">
+                        CURRENT ACTIVE
+                      </Badge>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-slate-200 font-medium">{t.assigneeName}</span>{' '}
-                    <span className="text-slate-400">
-                      {t.status === 'COMPLETED' ? 'completed sprint task' : 'is working on'}:
-                    </span>{' '}
-                    <span className="text-slate-100 font-semibold">{t.title}</span>
-                  </div>
+                  {t.description && <p className="text-slate-500 text-[11px] mt-0.5">{t.description}</p>}
                 </div>
-                <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {formatDate(t.updatedAt)}
-                </span>
+
+                {activeTeam?.id !== t.id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.location.reload();
+                    }}
+                  >
+                    Switch to Workspace
+                  </Button>
+                )}
               </div>
             ))}
-
-            {(!tasksPage?.content || tasksPage.content.length === 0) && (
-              <p className="text-xs text-slate-500 italic text-center py-4">
-                No recent activity recorded for this team yet.
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Member Detail Modal */}
-      {viewingMember && (
-        <Modal
-          isOpen={!!viewingMember}
-          onClose={() => setViewingMember(null)}
-          title={`Team Member: ${viewingMember.userName}`}
-          description="Workspace membership details and role assignment"
-        >
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white font-bold text-base shadow-md">
-                {viewingMember.userName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-slate-100 truncate">{viewingMember.userName}</h3>
-                <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
-                  <Mail className="w-3.5 h-3.5 text-slate-500" /> {viewingMember.userEmail}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Workspace Role</span>
-                <span className="font-bold text-slate-200 mt-1 block">{viewingMember.role}</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Joined Date</span>
-                <span className="font-bold text-slate-200 mt-1 block">
-                  {formatDate(viewingMember.joinedAt)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-              <Button variant="outline" size="sm" onClick={() => setViewingMember(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Add / Invite Member Modal */}
+      {/* Add Member Modal */}
       <Modal
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-        title="Add Member to Team"
-        description="Add a registered developer to your accountability team."
+        isOpen={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        title={`Add Member to "${activeTeam?.name}"`}
+        description="Select a registered developer to join this workspace"
       >
-        <form onSubmit={handleAddMember} className="space-y-4">
-          {availableUsersToInvite.length > 0 ? (
-            <Select
-              label="Select User *"
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              options={availableUsersToInvite.map((u) => ({
-                label: `${u.name} (${u.email})`,
-                value: u.id,
-              }))}
-              required
-            />
-          ) : (
-            <p className="text-xs text-slate-400 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-              All registered users in the database are already members of this team.
-            </p>
-          )}
+        <form onSubmit={handleAddMember} className="space-y-3">
+          <Select
+            label="Select Developer *"
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            options={availableUsersToAdd.map((u) => ({
+              label: `${u.name} (${u.email})`,
+              value: u.id,
+            }))}
+            required
+          />
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsInviteModalOpen(false)}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddMemberModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              isLoading={addMemberMutation.isPending}
-              disabled={availableUsersToInvite.length === 0}
-            >
+            <Button type="submit" variant="primary" size="sm" isLoading={addMemberMutation.isPending}>
               Add to Team
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Team Modal */}
+      <Modal
+        isOpen={isCreateTeamModalOpen}
+        onClose={() => setIsCreateTeamModalOpen(false)}
+        title="Create New Team Workspace"
+        description="Initialize a new team workspace. You will be assigned as the Team Lead."
+      >
+        <form onSubmit={handleCreateTeam} className="space-y-3">
+          <Input
+            label="Team Workspace Name *"
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
+            placeholder="e.g. Distributed Systems Lab"
+            required
+          />
+
+          <Input
+            label="Description (Optional)"
+            value={newTeamDescription}
+            onChange={(e) => setNewTeamDescription(e.target.value)}
+            placeholder="e.g. Backend performance, Raft, and consensus engineering"
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateTeamModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" size="sm" isLoading={isCreatingTeam}>
+              Create Team & Become Lead
             </Button>
           </div>
         </form>

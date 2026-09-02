@@ -1,18 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import {
-  AlarmClock,
-  Plus,
-  Search,
-  Calendar,
-  Clock,
-  Edit2,
-  Trash2,
-  PauseCircle,
-  PlayCircle,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Clock, Plus } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -20,455 +11,284 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
 import {
   useReminders,
   useCreateReminder,
   useUpdateReminder,
   useDeleteReminder,
 } from '@/hooks/useReminders';
-import { formatDate } from '@/lib/utils';
-import { Reminder, ReminderType, ReminderStatus } from '@/types/reminder';
+import { ReminderType } from '@/types/reminder';
 
 export const RemindersPage: React.FC = () => {
-  const { activeUser, activeTeam } = useApp();
+  const { user } = useAuth();
+  const { activeTeam } = useApp();
   const { showToast } = useToast();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Modals
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
-  const [deletingReminderId, setDeletingReminderId] = useState<string | null>(null);
-
-  // Form states
+  // Form State
+  const [type, setType] = useState<ReminderType>('DAILY_PROGRESS');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [type, setType] = useState<ReminderType>('DAILY_PROGRESS');
-  const [reminderTime, setReminderTime] = useState('09:00:00');
-  const [timezone, setTimezone] = useState(activeUser?.timezone || 'UTC');
+  const [reminderTime, setReminderTime] = useState('18:00');
+  const [timezone, setTimezone] = useState('UTC');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState('');
+  const [endDate, setEndDate] = useState(
+    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
 
-  // Queries
-  const {
-    data: remindersPage,
-    isLoading,
-    isError,
-    refetch,
-  } = useReminders({
-    userId: activeUser?.id,
+  const { data: remindersPage, isLoading } = useReminders({
+    userId: user?.id,
     teamId: activeTeam?.id,
-    size: 50,
+    size: 1000,
   });
 
-  // Mutations
   const createReminderMutation = useCreateReminder();
   const updateReminderMutation = useUpdateReminder();
   const deleteReminderMutation = useDeleteReminder();
 
   const allReminders = remindersPage?.content || [];
 
-  const filteredReminders = useMemo(() => {
-    return allReminders.filter((r) => {
-      const matchesSearch =
-        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.message && r.message.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesType = typeFilter === 'ALL' || r.type === typeFilter;
-      const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
-      return matchesSearch && matchesType && matchesStatus;
-    });
-  }, [allReminders, searchQuery, typeFilter, statusFilter]);
-
-  const handleOpenCreate = () => {
-    setEditingReminder(null);
-    setTitle('');
-    setMessage('');
-    setType('DAILY_PROGRESS');
-    setReminderTime('09:00:00');
-    setTimezone(activeUser?.timezone || 'UTC');
-    setStartDate(new Date().toISOString().split('T')[0]);
-    setEndDate('');
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (r: Reminder) => {
-    setEditingReminder(r);
-    setTitle(r.title);
-    setMessage(r.message || '');
-    setType(r.type);
-    setReminderTime(r.reminderTime);
-    setTimezone(r.timezone);
-    setStartDate(r.startDate);
-    setEndDate(r.endDate || '');
-    setIsModalOpen(true);
-  };
-
-  const handleSaveReminder = async (e: React.FormEvent) => {
+  const handleCreateReminder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      showToast('warning', 'Reminder title is required');
-      return;
-    }
-    if (!activeUser || !activeTeam) {
-      showToast('error', 'Active user and team required');
+    if (!user || !activeTeam) {
+      showToast('error', 'User or team not selected');
       return;
     }
 
     try {
-      // Ensure reminderTime formatted as HH:mm:ss
       const formattedTime = reminderTime.length === 5 ? `${reminderTime}:00` : reminderTime;
-
-      if (editingReminder) {
-        await updateReminderMutation.mutateAsync({
-          id: editingReminder.id,
-          data: {
-            title: title.trim(),
-            message: message.trim() ? message : undefined,
-            reminderTime: formattedTime,
-            timezone,
-            startDate,
-            endDate: endDate || undefined,
-          },
-        });
-        showToast('success', 'Reminder schedule updated successfully!');
-      } else {
-        await createReminderMutation.mutateAsync({
-          userId: activeUser.id,
-          teamId: activeTeam.id,
-          title: title.trim(),
-          message: message.trim() ? message : undefined,
-          type,
-          reminderTime: formattedTime,
-          timezone,
-          startDate,
-          endDate: endDate || undefined,
-        });
-        showToast('success', 'Scheduled reminder created successfully!');
-      }
-      setIsModalOpen(false);
+      await createReminderMutation.mutateAsync({
+        userId: user.id,
+        teamId: activeTeam.id,
+        type,
+        title: title.trim(),
+        message: message.trim() || undefined,
+        reminderTime: formattedTime,
+        timezone,
+        startDate,
+        endDate,
+      });
+      showToast('success', 'Scheduled reminder created successfully!');
+      setIsCreateModalOpen(false);
+      setTitle('');
+      setMessage('');
     } catch (err: unknown) {
-      showToast('error', 'Failed to save reminder', err instanceof Error ? err.message : 'Unknown error');
+      showToast('error', 'Failed to create reminder', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const handleToggleStatus = async (r: Reminder) => {
-    const nextStatus: ReminderStatus = r.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+  const handleToggleActive = async (id: string, currentActive: boolean) => {
     try {
       await updateReminderMutation.mutateAsync({
-        id: r.id,
-        data: {
-          status: nextStatus,
-          active: nextStatus === 'ACTIVE',
-        },
+        id,
+        data: { active: !currentActive },
       });
-      showToast('info', `Reminder ${nextStatus === 'ACTIVE' ? 'resumed' : 'paused'}`);
-    } catch (err: unknown) {
-      showToast('error', 'Failed to update status', err instanceof Error ? err.message : 'Unknown error');
+      showToast('success', `Reminder ${currentActive ? 'paused' : 'resumed'}`);
+    } catch {
+      showToast('error', 'Failed to toggle reminder status');
     }
   };
 
-  const handleDeleteReminder = async () => {
-    if (!deletingReminderId) return;
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this reminder?')) return;
     try {
-      await deleteReminderMutation.mutateAsync(deletingReminderId);
-      showToast('info', 'Reminder schedule deactivated');
-      setDeletingReminderId(null);
-    } catch (err: unknown) {
-      showToast('error', 'Failed to delete reminder', err instanceof Error ? err.message : 'Unknown error');
+      await deleteReminderMutation.mutateAsync(id);
+      showToast('success', 'Reminder removed');
+    } catch {
+      showToast('error', 'Failed to delete reminder');
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
+    <div className="space-y-4">
+      {/* 1. Header */}
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <AlarmClock className="w-5 h-5 text-amber-400" />
-            Scheduled Reminders & Check-ins
+          <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            Scheduled Accountability Reminders
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Configure automated daily study prompts, goal deadlines, and task alerts.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Automate daily standup prompts, goal check-ins, and task due date alerts
           </p>
         </div>
 
         <Button
           variant="primary"
           size="sm"
-          leftIcon={<Plus className="w-4 h-4" />}
-          onClick={handleOpenCreate}
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+          onClick={() => setIsCreateModalOpen(true)}
         >
           Create Reminder
         </Button>
       </div>
 
-      {/* 2. Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
-        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-xl">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search reminder title or message..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
+      {/* 2. Reminders Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configured Schedule</CardTitle>
+          <span className="text-[11px] text-slate-500">{allReminders.length} Active Schedules</span>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-4 space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : allReminders.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="classic-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}>#</th>
+                    <th>Type</th>
+                    <th>Title & Description</th>
+                    <th>Scheduled Time</th>
+                    <th>Timezone</th>
+                    <th>Date Range</th>
+                    <th>Status</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allReminders.map((r, idx) => (
+                    <tr key={r.id}>
+                      <td className="text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                      <td>
+                        <Badge size="sm" variant="primary">
+                          {r.type}
+                        </Badge>
+                      </td>
+                      <td>
+                        <div className="font-bold text-slate-900 dark:text-slate-100">{r.title}</div>
+                        {r.message && <div className="text-[11px] text-slate-500 line-clamp-1">{r.message}</div>}
+                      </td>
+                      <td className="font-mono font-bold text-blue-700 dark:text-blue-400">{r.reminderTime}</td>
+                      <td className="text-slate-600 dark:text-slate-400">{r.timezone}</td>
+                      <td className="text-[11px] text-slate-500">
+                        {r.startDate} → {r.endDate}
+                      </td>
+                      <td>
+                        <Badge size="sm" variant={r.active ? 'success' : 'danger'}>
+                          {r.active ? 'Active' : 'Paused'}
+                        </Badge>
+                      </td>
+                      <td className="text-right whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggleActive(r.id, r.active)}
+                          className="px-2 py-0.5 text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-[2px] font-semibold text-slate-700 dark:text-slate-200 mr-1"
+                        >
+                          {r.active ? 'Pause' : 'Resume'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          className="px-2 py-0.5 text-[11px] bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-[2px] font-semibold"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-6">
+              <EmptyState
+                icon={Clock}
+                title="No reminders scheduled"
+                description="Set up daily notifications to remind you to log progress and review active goals."
+                action={
+                  <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+                    Create Reminder
+                  </Button>
+                }
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="ALL">All Types</option>
-            <option value="DAILY_PROGRESS">Daily Progress</option>
-            <option value="GOAL_CHECKIN">Goal Check-in</option>
-            <option value="TASK_DUE">Task Due</option>
-            <option value="CUSTOM">Custom</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="PAUSED">Paused</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
-      </div>
-
-      {/* 3. Reminder List */}
-      {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20 rounded-2xl" />
-          <Skeleton className="h-20 rounded-2xl" />
-        </div>
-      ) : isError ? (
-        <ErrorState
-          title="Failed to load scheduled reminders"
-          description="Could not connect to the backend server. Please try again."
-          onRetry={() => refetch()}
-        />
-      ) : filteredReminders.length === 0 ? (
-        <EmptyState
-          icon={AlarmClock}
-          title="No scheduled reminders"
-          description="Never miss a study milestone or team sync by scheduling daily reminders."
-          action={
-            <Button variant="primary" size="sm" onClick={handleOpenCreate}>
-              Create Reminder
-            </Button>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredReminders.map((r) => {
-            const isActive = r.status === 'ACTIVE' && r.active;
-            return (
-              <Card
-                key={r.id}
-                hoverable
-                className={`p-4 flex flex-col justify-between space-y-3 transition-all ${
-                  isActive ? 'border-slate-800' : 'opacity-70 border-dashed border-slate-800'
-                }`}
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slate-100">{r.title}</span>
-                      <Badge
-                        size="sm"
-                        variant={
-                          r.type === 'DAILY_PROGRESS'
-                            ? 'primary'
-                            : r.type === 'GOAL_CHECKIN'
-                            ? 'warning'
-                            : 'default'
-                        }
-                      >
-                        {r.type.replace('_', ' ')}
-                      </Badge>
-                    </div>
-
-                    <button
-                      onClick={() => handleToggleStatus(r)}
-                      className={`p-1 rounded-lg transition-colors ${
-                        isActive
-                          ? 'text-emerald-400 hover:bg-emerald-950/30'
-                          : 'text-slate-500 hover:text-emerald-400'
-                      }`}
-                      title={isActive ? 'Pause reminder' : 'Resume reminder'}
-                    >
-                      {isActive ? (
-                        <PlayCircle className="w-4 h-4" />
-                      ) : (
-                        <PauseCircle className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  {r.message && <p className="text-xs text-slate-400 mt-1">{r.message}</p>}
-                </div>
-
-                <div className="space-y-1.5 pt-2 border-t border-slate-850 text-xs text-slate-400">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 font-mono text-primary-300">
-                      <Clock className="w-3.5 h-3.5" />
-                      {r.reminderTime.substring(0, 5)} {r.timezone}
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                      <Calendar className="w-3 h-3" />
-                      Since {formatDate(r.startDate)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-850">
-                  <Badge size="sm" variant={isActive ? 'success' : 'default'}>
-                    {r.status}
-                  </Badge>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(r)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-                      title="Edit reminder"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeletingReminderId(r.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition-colors"
-                      title="Deactivate reminder"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Create/Edit Modal */}
+      {/* Create Reminder Modal */}
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingReminder ? 'Edit Reminder Schedule' : 'Create Scheduled Reminder'}
-        description="Set recurring alerts for daily progress, goals, and tasks."
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Create Scheduled Reminder"
+        description="Configure automated notifications for your team workflow"
       >
-        <form onSubmit={handleSaveReminder} className="space-y-4">
+        <form onSubmit={handleCreateReminder} className="space-y-3">
+          <Select
+            label="Reminder Type *"
+            value={type}
+            onChange={(e) => setType(e.target.value as ReminderType)}
+            options={[
+              { label: 'Daily Progress Submission', value: 'DAILY_PROGRESS' },
+              { label: 'Goal Milestone Review', value: 'GOAL_REVIEW' },
+              { label: 'Task Due Reminder', value: 'TASK_DUE' },
+              { label: 'Custom Alert', value: 'CUSTOM' },
+            ]}
+          />
+
           <Input
-            label="Reminder Title *"
-            placeholder="e.g. Evening DSA & System Design Check-in"
+            label="Title *"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Evening Standup Check-in"
             required
           />
 
           <Input
             label="Message (Optional)"
-            placeholder="e.g. Don't forget to record today's focus hours and solved problems"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            placeholder="e.g. Please log today's focus hours and completed tasks"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Reminder Type"
-              value={type}
-              onChange={(e) => setType(e.target.value as ReminderType)}
-              options={[
-                { label: 'Daily Progress Prompt', value: 'DAILY_PROGRESS' },
-                { label: 'Goal Check-in', value: 'GOAL_CHECKIN' },
-                { label: 'Task Due Alert', value: 'TASK_DUE' },
-                { label: 'Custom Alert', value: 'CUSTOM' },
-              ]}
-            />
-
+          <div className="grid grid-cols-2 gap-2">
             <Input
+              label="Reminder Time *"
               type="time"
-              label="Reminder Time (HH:mm) *"
-              value={reminderTime.substring(0, 5)}
+              value={reminderTime}
               onChange={(e) => setReminderTime(e.target.value)}
               required
             />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Timezone *"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              placeholder="e.g. UTC, Asia/Kolkata, America/New_York"
+              placeholder="e.g. UTC, Asia/Kolkata"
               required
             />
+          </div>
 
+          <div className="grid grid-cols-2 gap-2">
             <Input
-              type="date"
               label="Start Date *"
+              type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
             />
+            <Input
+              label="End Date *"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+            />
           </div>
 
-          <Input
-            type="date"
-            label="End Date (Optional)"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              isLoading={createReminderMutation.isPending || updateReminderMutation.isPending}
-            >
-              {editingReminder ? 'Update Reminder' : 'Create Reminder'}
+            <Button type="submit" variant="primary" size="sm" isLoading={createReminderMutation.isPending}>
+              Schedule Reminder
             </Button>
           </div>
         </form>
       </Modal>
-
-      {/* Delete Confirmation Modal */}
-      {deletingReminderId && (
-        <Modal
-          isOpen={!!deletingReminderId}
-          onClose={() => setDeletingReminderId(null)}
-          title="Deactivate Reminder"
-          description="Are you sure you want to deactivate this scheduled reminder?"
-        >
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" size="sm" onClick={() => setDeletingReminderId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleDeleteReminder}
-              isLoading={deleteReminderMutation.isPending}
-            >
-              Confirm Deactivation
-            </Button>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

@@ -1,6 +1,11 @@
 import { apiClient } from './client';
 import { ApiResponse, PageResponse } from '@/types/api';
-import { DailyProgress, CreateDailyProgressRequest, UpdateDailyProgressRequest, ProgressFilterParams } from '@/types/progress';
+import {
+  DailyProgress,
+  CreateDailyProgressRequest,
+  UpdateDailyProgressRequest,
+  ProgressFilterParams,
+} from '@/types/progress';
 
 export const progressApi = {
   getProgressList: async (params?: ProgressFilterParams): Promise<PageResponse<DailyProgress>> => {
@@ -14,12 +19,22 @@ export const progressApi = {
   },
 
   createProgress: async (data: CreateDailyProgressRequest): Promise<DailyProgress> => {
-    const res = await apiClient.post<ApiResponse<DailyProgress>>('/progress', data);
+    const payload = {
+      ...data,
+      completed: data.completed || data.whatCompleted || data.whatStudied || 'In progress',
+      challenges: data.challenges || data.blockers || undefined,
+    };
+    const res = await apiClient.post<ApiResponse<DailyProgress>>('/progress', payload);
     return res.data.data;
   },
 
   updateProgress: async (id: string, data: UpdateDailyProgressRequest): Promise<DailyProgress> => {
-    const res = await apiClient.put<ApiResponse<DailyProgress>>(`/progress/${id}`, data);
+    const payload = {
+      ...data,
+      completed: data.completed || data.whatCompleted || data.whatStudied || 'In progress',
+      challenges: data.challenges || data.blockers || undefined,
+    };
+    const res = await apiClient.put<ApiResponse<DailyProgress>>(`/progress/${id}`, payload);
     return res.data.data;
   },
 };

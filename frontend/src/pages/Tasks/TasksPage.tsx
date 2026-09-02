@@ -1,21 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   CheckSquare,
   Plus,
   Search,
-  Calendar,
-  User as UserIcon,
-  Target,
-  Edit2,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
   Kanban,
-  List,
+  List as ListIcon,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -26,251 +20,169 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks';
 import { useGoals } from '@/hooks/useGoals';
 import { formatDate } from '@/lib/utils';
-import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { filterRealUsers } from '@/lib/userFilter';
+import { Task, TaskPriority, TaskStatus } from '@/types/task';
 
 export const TasksPage: React.FC = () => {
-  const { activeUser, activeTeam, users } = useApp();
+  const { activeTeam, users } = useApp();
+  const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN');
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('LIST');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter] = useState<string>('ALL');
-  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [goalFilter, setGoalFilter] = useState<string>('ALL');
-  const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
-  const [sortBy, setSortBy] = useState<'PRIORITY' | 'DUE_DATE' | 'CREATED_AT'>('DUE_DATE');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Modals
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [viewingTask, setViewingTask] = useState<Task | null>(null);
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
-
-  // Form states
+  // Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [goalId, setGoalId] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
-  const [status, setStatus] = useState<TaskStatus>('TODO');
-  const [selectedGoalId, setSelectedGoalId] = useState('');
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
-  const [estimatedMinutes, setEstimatedMinutes] = useState<number>(60);
-  const [dueDate, setDueDate] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState('60');
+  const [dueDate, setDueDate] = useState(
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
 
-  // Queries
-  const { data: tasksPage, isLoading: isTasksLoading } = useTasks({
-    teamId: activeTeam?.id,
-    active: true,
-    size: 100,
-  });
+  const { data: tasksPage, isLoading } = useTasks({ teamId: activeTeam?.id, active: true, size: 1000 });
+  const { data: goalsPage } = useGoals({ teamId: activeTeam?.id, active: true, size: 1000 });
 
-  const { data: goalsPage } = useGoals({
-    teamId: activeTeam?.id,
-    active: true,
-    size: 50,
-  });
-
-  // Mutations
   const createTaskMutation = useCreateTask();
   const updateTaskMutation = useUpdateTask();
   const deleteTaskMutation = useDeleteTask();
 
-  const goalsList = goalsPage?.content || [];
   const allTasks = tasksPage?.content || [];
+  const allGoals = goalsPage?.content || [];
+  const realUsers = filterRealUsers(users);
 
-  // Filtered & Sorted Tasks
-  const filteredTasks = useMemo(() => {
-    return allTasks
-      .filter((t) => {
-        const matchesSearch =
-          t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (t.assigneeName && t.assigneeName.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredTasks = allTasks.filter((t) => {
+    const matchesSearch =
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+    const matchesGoal = goalFilter === 'ALL' || t.goalId === goalFilter;
+    return matchesSearch && matchesStatus && matchesGoal;
+  });
 
-        const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-        const matchesPriority = priorityFilter === 'ALL' || t.priority === priorityFilter;
-        const matchesGoal = goalFilter === 'ALL' || t.goalId === goalFilter;
-
-        const isTaskOverdue =
-          t.dueDate &&
-          t.status !== 'COMPLETED' &&
-          new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
-        const matchesOverdue = !onlyOverdue || isTaskOverdue;
-
-        return matchesSearch && matchesStatus && matchesPriority && matchesGoal && matchesOverdue;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'PRIORITY') {
-          const pOrder: Record<TaskPriority, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-          return pOrder[b.priority] - pOrder[a.priority];
-        }
-        if (sortBy === 'DUE_DATE') {
-          if (!a.dueDate) return 1;
-          if (!b.dueDate) return -1;
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-        }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-  }, [allTasks, searchQuery, statusFilter, priorityFilter, goalFilter, onlyOverdue, sortBy]);
-
-  const handleOpenCreate = () => {
-    setEditingTask(null);
-    setTitle('');
-    setDescription('');
-    setPriority('MEDIUM');
-    setStatus('TODO');
-    setSelectedGoalId(goalsList[0]?.id || '');
-    setSelectedAssigneeId(activeUser?.id || users[0]?.id || '');
-    setEstimatedMinutes(60);
-    setDueDate('');
-    setIsCreateOpen(true);
-  };
-
-  const handleOpenEdit = (t: Task) => {
-    setEditingTask(t);
-    setTitle(t.title);
-    setDescription(t.description || '');
-    setPriority(t.priority);
-    setStatus(t.status);
-    setSelectedGoalId(t.goalId);
-    setSelectedAssigneeId(t.assigneeId);
-    setEstimatedMinutes(t.estimatedMinutes || 60);
-    setDueDate(t.dueDate || '');
-    setIsCreateOpen(true);
-  };
-
-  const handleSaveTask = async (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      showToast('warning', 'Task title is required');
-      return;
-    }
-    if (!selectedGoalId) {
+    if (!goalId) {
       showToast('warning', 'Please select an associated goal');
       return;
     }
-    if (!selectedAssigneeId) {
+    const finalAssigneeId = assigneeId || user?.id;
+    if (!finalAssigneeId) {
       showToast('warning', 'Please select an assignee');
       return;
     }
 
     try {
-      if (editingTask) {
-        await updateTaskMutation.mutateAsync({
-          id: editingTask.id,
-          data: {
-            title: title.trim(),
-            description: description.trim() ? description : undefined,
-            status,
-            priority,
-            estimatedMinutes: Number(estimatedMinutes) || undefined,
-            dueDate: dueDate || undefined,
-            active: true,
-          },
-        });
-        showToast('success', 'Task updated successfully!');
-      } else {
-        await createTaskMutation.mutateAsync({
-          goalId: selectedGoalId,
-          assigneeId: selectedAssigneeId,
-          title: title.trim(),
-          description: description.trim() ? description : undefined,
-          priority,
-          estimatedMinutes: Number(estimatedMinutes) || undefined,
-          dueDate: dueDate || undefined,
-        });
-        showToast('success', 'Task created successfully!');
-      }
-      setIsCreateOpen(false);
+      await createTaskMutation.mutateAsync({
+        goalId,
+        assigneeId: finalAssigneeId,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        priority,
+        estimatedMinutes: parseInt(estimatedMinutes, 10) || 60,
+        dueDate,
+      });
+      showToast('success', 'Sprint task created successfully!');
+      setIsCreateModalOpen(false);
+      setTitle('');
+      setDescription('');
     } catch (err: unknown) {
-      showToast('error', 'Failed to save task', err instanceof Error ? err.message : 'Unknown error');
+      showToast('error', 'Failed to create task', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const handleToggleTaskStatus = async (task: Task, nextStatus: TaskStatus) => {
+  const handleUpdateStatus = async (task: Task, newStatus: TaskStatus) => {
     try {
       await updateTaskMutation.mutateAsync({
         id: task.id,
         data: {
           title: task.title,
           description: task.description || undefined,
-          status: nextStatus,
           priority: task.priority,
           estimatedMinutes: task.estimatedMinutes || undefined,
-          actualMinutes: task.actualMinutes || undefined,
           dueDate: task.dueDate || undefined,
-          active: true,
+          status: newStatus,
         },
       });
-      showToast(
-        'success',
-        nextStatus === 'COMPLETED' ? 'Task marked completed! (+20 pts)' : `Task moved to ${nextStatus}`
-      );
+      showToast('success', `Task status updated to ${newStatus}`);
     } catch (err: unknown) {
-      showToast('error', 'Failed to update status', err instanceof Error ? err.message : 'Unknown error');
+      showToast('error', 'Failed to update task status', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const handleDeleteTask = async () => {
-    if (!deletingTaskId) return;
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
     try {
-      await deleteTaskMutation.mutateAsync(deletingTaskId);
-      showToast('info', 'Task deleted successfully');
-      setDeletingTaskId(null);
+      await deleteTaskMutation.mutateAsync(id);
+      showToast('success', 'Task removed');
     } catch (err: unknown) {
       showToast('error', 'Failed to delete task', err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
-  const kanbanColumns: { id: TaskStatus; label: string; color: string }[] = [
-    { id: 'TODO', label: 'To Do', color: 'border-slate-700' },
-    { id: 'IN_PROGRESS', label: 'In Progress', color: 'border-primary-500/50' },
-    { id: 'COMPLETED', label: 'Completed', color: 'border-emerald-500/50' },
+  const kanbanColumns: { status: TaskStatus; title: string }[] = [
+    { status: 'TODO', title: 'To Do' },
+    { status: 'IN_PROGRESS', title: 'In Progress' },
+    { status: 'COMPLETED', title: 'Completed' },
+    { status: 'BLOCKED', title: 'Blocked' },
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-850">
+    <div className="space-y-4">
+      {/* 1. Tasks Header */}
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-emerald-400" />
-            Sprint & Milestone Tasks
+          <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-emerald-600" />
+            Sprint Tasks & Kanban Board
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Break down active learning goals into actionable units of work.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Manage actionable sprint tasks, track assignees, and update deliverables
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View switcher */}
-          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5">
+          {/* View Toggle */}
+          <div className="flex border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] overflow-hidden">
+            <button
+              onClick={() => setViewMode('LIST')}
+              className={`px-2.5 py-1 text-xs font-semibold flex items-center gap-1 ${
+                viewMode === 'LIST'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <ListIcon className="w-3.5 h-3.5" /> List
+            </button>
             <button
               onClick={() => setViewMode('KANBAN')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              className={`px-2.5 py-1 text-xs font-semibold flex items-center gap-1 ${
                 viewMode === 'KANBAN'
-                  ? 'bg-primary-600/30 text-primary-300 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               <Kanban className="w-3.5 h-3.5" /> Kanban
-            </button>
-            <button
-              onClick={() => setViewMode('LIST')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                viewMode === 'LIST'
-                  ? 'bg-primary-600/30 text-primary-300 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" /> List
             </button>
           </div>
 
           <Button
             variant="primary"
             size="sm"
-            leftIcon={<Plus className="w-4 h-4" />}
-            onClick={handleOpenCreate}
+            leftIcon={<Plus className="w-3.5 h-3.5" />}
+            onClick={() => {
+              if (allGoals.length === 0) {
+                showToast('warning', 'Please create a goal before creating tasks.');
+              }
+              setGoalId(allGoals[0]?.id || '');
+              setAssigneeId(user?.id || realUsers[0]?.id || '');
+              setIsCreateModalOpen(true);
+            }}
           >
             Create Task
           </Button>
@@ -278,327 +190,224 @@ export const TasksPage: React.FC = () => {
       </div>
 
       {/* 2. Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
-        <div className="flex flex-wrap items-center gap-2 flex-1 max-w-2xl">
-          {/* Search */}
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-2.5 rounded-[3px] flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-1 max-w-lg">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search tasks, descriptions, assignees..."
+              placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="w-full pl-8 pr-2.5 py-1 text-xs border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600"
             />
           </div>
 
-          {/* Goal Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2 py-1 text-xs border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="TODO">To Do</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="BLOCKED">Blocked</option>
+          </select>
+
           <select
             value={goalFilter}
             onChange={(e) => setGoalFilter(e.target.value)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
+            className="px-2 py-1 text-xs border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 max-w-[150px] truncate"
           >
             <option value="ALL">All Goals</option>
-            {goalsList.map((g) => (
+            {allGoals.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.title}
               </option>
             ))}
           </select>
-
-          {/* Priority Filter */}
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="ALL">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="CRITICAL">Critical</option>
-          </select>
-
-          {/* Overdue Toggle */}
-          <button
-            onClick={() => setOnlyOverdue(!onlyOverdue)}
-            className={`h-8 px-2.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
-              onlyOverdue
-                ? 'bg-rose-950/40 border-rose-800 text-rose-300'
-                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> Overdue Only
-          </button>
         </div>
 
-        {/* Sort selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="h-8 px-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 focus:outline-none"
-          >
-            <option value="DUE_DATE">Due Date</option>
-            <option value="PRIORITY">Priority</option>
-            <option value="CREATED_AT">Newest First</option>
-          </select>
-        </div>
+        <span className="text-[11px] text-slate-500 font-semibold">
+          Showing {filteredTasks.length} of {allTasks.length} Tasks
+        </span>
       </div>
 
       {/* 3. Task Views */}
-      {isTasksLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
-        </div>
-      ) : filteredTasks.length === 0 ? (
-        <EmptyState
-          icon={CheckSquare}
-          title="No matching tasks found"
-          description="Try clearing your search query or filters, or create a new task."
-          action={
-            <Button variant="primary" size="sm" onClick={handleOpenCreate}>
-              Create Task
-            </Button>
-          }
-        />
-      ) : viewMode === 'KANBAN' ? (
-        /* KANBAN BOARD */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          {kanbanColumns.map((col) => {
-            const colTasks = filteredTasks.filter((t) => t.status === col.id);
-            return (
-              <div
-                key={col.id}
-                className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-3 space-y-3"
-              >
-                {/* Column Header */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-200">{col.label}</span>
-                    <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400">
-                      {colTasks.length}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Column Tasks */}
-                <div className="space-y-2 min-h-[160px]">
-                  {colTasks.length > 0 ? (
-                    colTasks.map((t) => {
-                      const isOverdue =
-                        t.dueDate &&
-                        t.status !== 'COMPLETED' &&
-                        new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
-
-                      return (
-                        <div
-                          key={t.id}
-                          className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 transition-all space-y-2.5 group shadow-sm"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-200 line-clamp-2">
-                              {t.title}
-                            </span>
-                            <Badge
-                              size="sm"
-                              variant={
-                                t.priority === 'CRITICAL'
-                                  ? 'danger'
-                                  : t.priority === 'HIGH'
-                                  ? 'warning'
-                                  : 'default'
-                              }
-                            >
-                              {t.priority}
-                            </Badge>
-                          </div>
-
-                          {t.description && (
-                            <p className="text-[11px] text-slate-400 line-clamp-2">
-                              {t.description}
-                            </p>
-                          )}
-
-                          <div className="space-y-1 pt-1 border-t border-slate-850 text-[10px] text-slate-500">
-                            <div className="flex items-center justify-between">
-                              <span className="flex items-center gap-1 truncate max-w-[130px]">
-                                <Target className="w-3 h-3 text-indigo-400 shrink-0" />
-                                {t.goalTitle}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <UserIcon className="w-3 h-3 text-slate-400" />
-                                {t.assigneeName}
-                              </span>
-                            </div>
-
-                            {t.dueDate && (
-                              <div
-                                className={`flex items-center gap-1 pt-0.5 ${
-                                  isOverdue ? 'text-rose-400 font-semibold' : 'text-slate-400'
-                                }`}
-                              >
-                                <Calendar className="w-3 h-3" />
-                                <span>Due {formatDate(t.dueDate)}</span>
-                                {isOverdue && <span>(Overdue)</span>}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Quick Status Buttons & Actions */}
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-850">
-                            <div className="flex items-center gap-1">
-                              {col.id !== 'TODO' && (
-                                <button
-                                  onClick={() => handleToggleTaskStatus(t, 'TODO')}
-                                  className="text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800"
-                                >
-                                  To Todo
-                                </button>
-                              )}
-                              {col.id !== 'IN_PROGRESS' && (
-                                <button
-                                  onClick={() => handleToggleTaskStatus(t, 'IN_PROGRESS')}
-                                  className="text-[10px] text-primary-400 hover:text-primary-300 px-1.5 py-0.5 rounded bg-primary-950/40 border border-primary-800/60"
-                                >
-                                  In Progress
-                                </button>
-                              )}
-                              {col.id !== 'COMPLETED' && (
-                                <button
-                                  onClick={() => handleToggleTaskStatus(t, 'COMPLETED')}
-                                  className="text-[10px] text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/60"
-                                >
-                                  Complete
-                                </button>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => setViewingTask(t)}
-                                className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
-                                title="View details"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenEdit(t)}
-                                className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
-                                title="Edit task"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setDeletingTaskId(t.id)}
-                                className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
-                                title="Delete task"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="h-32 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-800/80 rounded-xl text-slate-500 text-xs">
-                      No tasks in {col.label.toLowerCase()}
-                    </div>
-                  )}
-                </div>
+      {viewMode === 'LIST' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sprint Task Inventory</CardTitle>
+            <span className="text-[11px] text-slate-500">{filteredTasks.length} Tasks Listed</span>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-4 space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
               </div>
-            );
-          })}
-        </div>
+            ) : filteredTasks.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="classic-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '40px' }}>#</th>
+                      <th>Task Title</th>
+                      <th>Goal Milestone</th>
+                      <th>Assignee</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Est. Time</th>
+                      <th>Due Date</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.map((t, idx) => (
+                      <tr key={t.id}>
+                        <td className="text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                        <td>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{t.title}</div>
+                          {t.description && <div className="text-[11px] text-slate-500 line-clamp-1">{t.description}</div>}
+                        </td>
+                        <td className="text-slate-600 dark:text-slate-400 max-w-[140px] truncate">{t.goalTitle}</td>
+                        <td className="text-slate-600 dark:text-slate-400 font-semibold">{t.assigneeName}</td>
+                        <td>
+                          <Badge
+                            size="sm"
+                            variant={
+                              t.priority === 'CRITICAL' || t.priority === 'HIGH'
+                                ? 'danger'
+                                : t.priority === 'MEDIUM'
+                                ? 'warning'
+                                : 'default'
+                            }
+                          >
+                            {t.priority}
+                          </Badge>
+                        </td>
+                        <td>
+                          <Badge
+                            size="sm"
+                            variant={
+                              t.status === 'COMPLETED'
+                                ? 'success'
+                                : t.status === 'IN_PROGRESS'
+                                ? 'primary'
+                                : t.status === 'BLOCKED'
+                                ? 'danger'
+                                : 'default'
+                            }
+                          >
+                            {t.status}
+                          </Badge>
+                        </td>
+                        <td className="text-slate-500 text-[11px]">{t.estimatedMinutes}m</td>
+                        <td className="text-slate-500 text-[11px]">{formatDate(t.dueDate)}</td>
+                        <td className="text-right whitespace-nowrap">
+                          {t.status !== 'COMPLETED' && (
+                            <button
+                              onClick={() => handleUpdateStatus(t, 'COMPLETED')}
+                              className="px-2 py-0.5 text-[11px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-[2px] font-semibold mr-1"
+                            >
+                              Complete
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteTask(t.id)}
+                            className="px-2 py-0.5 text-[11px] bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-[2px] font-semibold"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6">
+                <EmptyState
+                  icon={CheckSquare}
+                  title="No tasks found"
+                  description="Create actionable sprint tasks associated with your learning goals."
+                  action={
+                    <Button variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+                      Create Task
+                    </Button>
+                  }
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
       ) : (
-        /* LIST VIEW */
-        <div className="space-y-2">
-          {filteredTasks.map((t) => {
-            const isCompleted = t.status === 'COMPLETED';
-            const isOverdue =
-              t.dueDate &&
-              !isCompleted &&
-              new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
-
+        /* Classic Kanban View */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {kanbanColumns.map((col) => {
+            const colTasks = filteredTasks.filter((t) => t.status === col.status);
             return (
-              <div
-                key={t.id}
-                className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-4 hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <button
-                    onClick={() => handleToggleTaskStatus(t, isCompleted ? 'TODO' : 'COMPLETED')}
-                    className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                      isCompleted
-                        ? 'bg-emerald-600 border-emerald-500 text-white'
-                        : 'border-slate-700 hover:border-emerald-500 text-transparent'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </button>
-
-                  <div className="min-w-0">
-                    <p
-                      className={`text-xs font-semibold truncate ${
-                        isCompleted ? 'line-through text-slate-500' : 'text-slate-200'
-                      }`}
-                    >
-                      {t.title}
-                    </p>
-                    <p className="text-[10px] text-slate-500 truncate flex items-center gap-2">
-                      <span>{t.goalTitle}</span>
-                      <span>•</span>
-                      <span>Assignee: {t.assigneeName}</span>
-                      {t.dueDate && (
-                        <>
-                          <span>•</span>
-                          <span className={isOverdue ? 'text-rose-400 font-semibold' : ''}>
-                            Due {formatDate(t.dueDate)}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  <Badge
-                    size="sm"
-                    variant={
-                      t.status === 'COMPLETED'
-                        ? 'success'
-                        : t.status === 'IN_PROGRESS'
-                        ? 'primary'
-                        : 'default'
-                    }
-                  >
-                    {t.status}
+              <div key={col.status} className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 rounded-[3px] flex flex-col h-full shadow-xs">
+                <div className="classic-header-bar flex items-center justify-between">
+                  <span>{col.title}</span>
+                  <Badge size="sm" variant="default">
+                    {colTasks.length}
                   </Badge>
+                </div>
+                <div className="p-2 space-y-2 flex-1 min-h-[300px] bg-[#f8fafc] dark:bg-slate-900/60">
+                  {colTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      className="p-2.5 bg-white dark:bg-slate-800 border border-[#cfd5dc] dark:border-slate-700 rounded-[2px] shadow-2xs space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{t.title}</span>
+                        <Badge
+                          size="sm"
+                          variant={
+                            t.priority === 'CRITICAL' || t.priority === 'HIGH'
+                              ? 'danger'
+                              : t.priority === 'MEDIUM'
+                              ? 'warning'
+                              : 'default'
+                          }
+                        >
+                          {t.priority}
+                        </Badge>
+                      </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setViewingTask(t)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleOpenEdit(t)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeletingTaskId(t.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                      {t.description && <p className="text-[11px] text-slate-500 line-clamp-2">{t.description}</p>}
+
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-700">
+                        <span>{t.assigneeName}</span>
+                        <span>{t.estimatedMinutes}m</span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <select
+                          value={t.status}
+                          onChange={(e) => handleUpdateStatus(t, e.target.value as TaskStatus)}
+                          className="text-[10px] py-0.5 px-1 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-[2px]"
+                        >
+                          <option value="TODO">To Do</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="COMPLETED">Completed</option>
+                          <option value="BLOCKED">Blocked</option>
+                        </select>
+                        <button
+                          onClick={() => handleDeleteTask(t.id)}
+                          className="text-[10px] text-red-600 hover:underline font-semibold"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {colTasks.length === 0 && (
+                    <p className="text-[11px] text-slate-400 italic text-center py-6">No tasks</p>
+                  )}
                 </div>
               </div>
             );
@@ -606,50 +415,52 @@ export const TasksPage: React.FC = () => {
         </div>
       )}
 
-      {/* Create/Edit Task Modal */}
+      {/* Create Task Modal */}
       <Modal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        title={editingTask ? 'Edit Task' : 'Create Sprint Task'}
-        description="Assign actionable work tied to learning milestones."
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Create Sprint Task"
+        description="Add a task under an existing goal milestone"
       >
-        <form onSubmit={handleSaveTask} className="space-y-4">
+        <form onSubmit={handleCreateTask} className="space-y-3">
           <Input
             label="Task Title *"
-            placeholder="e.g. Implement binary search tree traversal"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Implement Raft leader election"
+            required
+          />
+          <Input
+            label="Description (Optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Handle heartbeat timeouts and term increments"
+          />
+
+          <Select
+            label="Associated Goal *"
+            value={goalId}
+            onChange={(e) => setGoalId(e.target.value)}
+            options={allGoals.map((g) => ({
+              label: g.title,
+              value: g.id,
+            }))}
             required
           />
 
-          <Input
-            label="Description (Optional)"
-            placeholder="e.g. Include recursive and iterative approaches with unit tests"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Associated Goal *"
-              value={selectedGoalId}
-              onChange={(e) => setSelectedGoalId(e.target.value)}
-              options={goalsList.map((g) => ({ label: g.title, value: g.id }))}
-              required
-            />
-
+          <div className="grid grid-cols-2 gap-2">
             <Select
               label="Assignee *"
-              value={selectedAssigneeId}
-              onChange={(e) => setSelectedAssigneeId(e.target.value)}
-              options={users.map((u) => ({ label: u.name, value: u.id }))}
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+              options={realUsers.map((u) => ({
+                label: `${u.name} (${u.email})`,
+                value: u.id,
+              }))}
               required
             />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Select
-              label="Priority"
+              label="Priority *"
               value={priority}
               onChange={(e) => setPriority(e.target.value as TaskPriority)}
               options={[
@@ -659,166 +470,37 @@ export const TasksPage: React.FC = () => {
                 { label: 'Critical', value: 'CRITICAL' },
               ]}
             />
+          </div>
 
-            <Select
-              label="Status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as TaskStatus)}
-              options={[
-                { label: 'To Do', value: 'TODO' },
-                { label: 'In Progress', value: 'IN_PROGRESS' },
-                { label: 'Completed', value: 'COMPLETED' },
-              ]}
-            />
-
+          <div className="grid grid-cols-2 gap-2">
             <Input
+              label="Estimated Time (Mins) *"
               type="number"
-              label="Est. Minutes"
+              min="5"
+              max="1440"
               value={estimatedMinutes}
-              onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
-              min={5}
+              onChange={(e) => setEstimatedMinutes(e.target.value)}
+              required
+            />
+            <Input
+              label="Due Date *"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              required
             />
           </div>
 
-          <Input
-            type="date"
-            label="Due Date (Optional)"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCreateOpen(false)}
-            >
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              isLoading={createTaskMutation.isPending || updateTaskMutation.isPending}
-            >
-              {editingTask ? 'Update Task' : 'Create Task'}
+            <Button type="submit" variant="primary" size="sm" isLoading={createTaskMutation.isPending}>
+              Create Task
             </Button>
           </div>
         </form>
       </Modal>
-
-      {/* Task Detail Modal */}
-      {viewingTask && (
-        <Modal
-          isOpen={!!viewingTask}
-          onClose={() => setViewingTask(null)}
-          title={viewingTask.title}
-          description={`Associated with goal: ${viewingTask.goalTitle}`}
-        >
-          <div className="space-y-4 text-xs">
-            {viewingTask.description && (
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">
-                  Description
-                </span>
-                <p className="text-slate-200 whitespace-pre-wrap">{viewingTask.description}</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Status</span>
-                <Badge
-                  size="sm"
-                  className="mt-1"
-                  variant={
-                    viewingTask.status === 'COMPLETED'
-                      ? 'success'
-                      : viewingTask.status === 'IN_PROGRESS'
-                      ? 'primary'
-                      : 'default'
-                  }
-                >
-                  {viewingTask.status}
-                </Badge>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Priority</span>
-                <Badge
-                  size="sm"
-                  className="mt-1"
-                  variant={
-                    viewingTask.priority === 'CRITICAL'
-                      ? 'danger'
-                      : viewingTask.priority === 'HIGH'
-                      ? 'warning'
-                      : 'default'
-                  }
-                >
-                  {viewingTask.priority}
-                </Badge>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Assignee</span>
-                <span className="font-semibold text-slate-200 mt-1 block">
-                  {viewingTask.assigneeName}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Due Date</span>
-                <span className="font-semibold text-slate-200 mt-1 block">
-                  {viewingTask.dueDate ? formatDate(viewingTask.dueDate) : 'No deadline'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-              <Button variant="outline" size="sm" onClick={() => setViewingTask(null)}>
-                Close
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  const current = viewingTask;
-                  setViewingTask(null);
-                  handleOpenEdit(current);
-                }}
-              >
-                Edit Task
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deletingTaskId && (
-        <Modal
-          isOpen={!!deletingTaskId}
-          onClose={() => setDeletingTaskId(null)}
-          title="Delete Task"
-          description="Are you sure you want to delete this task? This action cannot be undone."
-        >
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" size="sm" onClick={() => setDeletingTaskId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleDeleteTask}
-              isLoading={deleteTaskMutation.isPending}
-            >
-              Confirm Delete
-            </Button>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

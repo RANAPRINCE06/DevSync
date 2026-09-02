@@ -3,6 +3,7 @@ import { User } from '@/types/user';
 import { Team } from '@/types/team';
 import { userApi } from '@/services/userApi';
 import { teamApi } from '@/services/teamApi';
+import { filterRealUsers } from '@/lib/userFilter';
 import { useAuth } from './AuthContext';
 
 interface AppContextType {
@@ -13,6 +14,7 @@ interface AppContextType {
   setActiveTeam: (team: Team | null) => void;
   isLoading: boolean;
   refreshUsersAndTeams: () => Promise<void>;
+  createTeam: (name: string, description?: string) => Promise<Team>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -28,19 +30,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       setIsLoading(true);
       const [usersRes, teamsRes] = await Promise.allSettled([
-        userApi.getUsers({ size: 50 }),
-        teamApi.getTeams({ size: 50 }),
+        userApi.getUsers({ size: 1000 }),
+        teamApi.getTeams({ size: 1000 }),
       ]);
 
-      if (usersRes.status === 'fulfilled' && usersRes.value.content.length > 0) {
-        setUsers(usersRes.value.content);
+      if (usersRes.status === 'fulfilled' && usersRes.value.content) {
+        const realUsers = filterRealUsers(usersRes.value.content);
+        setUsers(realUsers);
       }
 
-      if (teamsRes.status === 'fulfilled' && teamsRes.value.content.length > 0) {
+      if (teamsRes.status === 'fulfilled' && teamsRes.value.content) {
         const fetchedTeams = teamsRes.value.content;
         setTeams(fetchedTeams);
-        if (!activeTeam) {
-          setActiveTeam(fetchedTeams[0]);
+        if (fetchedTeams.length > 0) {
+          setActiveTeam((prev) => {
+            if (!prev) return fetchedTeams[0];
+            const stillExists = fetchedTeams.find((t) => t.id === prev.id);
+            return stillExists || fetchedTeams[0];
+          });
         }
       }
     } catch {
@@ -48,6 +55,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const createTeam = async (name: string, description?: string): Promise<Team> => {
+    if (!authUser) {
+      throw new Error('You must be logged in to create a team.');
+    }
+    const newTeam = await teamApi.createTeam({
+      name,
+      description,
+      creatorUserId: authUser.id,
+    });
+    await refreshUsersAndTeams();
+    setActiveTeam(newTeam);
+    return newTeam;
   };
 
   useEffect(() => {
@@ -64,6 +85,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveTeam,
         isLoading,
         refreshUsersAndTeams,
+        createTeam,
       }}
     >
       {children}

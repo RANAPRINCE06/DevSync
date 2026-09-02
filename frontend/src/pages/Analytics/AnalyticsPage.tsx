@@ -1,13 +1,6 @@
-import React, { useMemo } from 'react';
-import {
-  BarChart3,
-  Clock,
-  CheckSquare,
-  Target,
-  Medal,
-  Zap,
-  Activity,
-} from 'lucide-react';
+import React from 'react';
+import { BarChart3 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -15,233 +8,195 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useProgressList } from '@/hooks/useProgress';
 import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
-import { useUserAchievements, useUserTotalPoints } from '@/hooks/useAchievements';
-import { formatMinutes, formatDate } from '@/lib/utils';
+import { useUserTotalPoints } from '@/hooks/useAchievements';
+import { DailyProgress } from '@/types/progress';
+import { Goal } from '@/types/goal';
+import { Task } from '@/types/task';
 
 export const AnalyticsPage: React.FC = () => {
-  const { activeUser, activeTeam } = useApp();
+  const { user } = useAuth();
+  const { activeTeam } = useApp();
 
-  // Queries (fetch up to 100 entries for deep analytics)
   const { data: progressPage, isLoading: isProgressLoading } = useProgressList({
-    userId: activeUser?.id,
+    userId: user?.id,
     teamId: activeTeam?.id,
-    size: 100,
+    size: 1000,
   });
 
-  const { data: goalsPage, isLoading: isGoalsLoading } = useGoals({
-    teamId: activeTeam?.id,
-    active: true,
-    size: 100,
-  });
+  const { data: goalsPage } = useGoals({ teamId: activeTeam?.id, active: true, size: 1000 });
+  const { data: tasksPage } = useTasks({ teamId: activeTeam?.id, active: true, size: 1000 });
+  const { data: pointsData } = useUserTotalPoints(user?.id);
 
-  const { data: tasksPage, isLoading: isTasksLoading } = useTasks({
-    teamId: activeTeam?.id,
-    active: true,
-    size: 100,
-  });
+  const logs = progressPage?.content || [];
+  const goals = goalsPage?.content || [];
+  const tasks = tasksPage?.content || [];
 
-  const { data: userAchievements, isLoading: isAchievementsLoading } = useUserAchievements(
-    activeUser?.id
-  );
-  const { data: totalPointsData } = useUserTotalPoints(activeUser?.id);
-
-  const allProgress = progressPage?.content || [];
-  const allGoals = goalsPage?.content || [];
-  const allTasks = tasksPage?.content || [];
-  const achievements = userAchievements || [];
-
-  // Focus Metrics
-  const totalFocusMinutes = allProgress.reduce((acc, curr) => acc + curr.studyMinutes, 0);
-  const averageFocusMinutes = allProgress.length > 0 ? Math.round(totalFocusMinutes / allProgress.length) : 0;
-  const highestFocusSession = allProgress.length > 0 ? Math.max(...allProgress.map((p) => p.studyMinutes)) : 0;
-
-  // Task Breakdown
-  const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').length;
-  const inProgressTasks = allTasks.filter((t) => t.status === 'IN_PROGRESS').length;
-  const todoTasks = allTasks.filter((t) => t.status === 'TODO').length;
-  const overdueTasks = allTasks.filter((t) => {
-    if (!t.dueDate || t.status === 'COMPLETED') return false;
-    return new Date(t.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
-  }).length;
-  const taskCompletionRate = allTasks.length > 0 ? Math.round((completedTasks / allTasks.length) * 100) : 0;
-
-  // Goal Breakdown
-  const completedGoals = allGoals.filter((g) => g.status === 'COMPLETED' || g.progress >= 100).length;
-  const activeGoals = allGoals.filter((g) => g.status !== 'COMPLETED' && g.progress < 100);
-  const averageGoalProgress =
-    allGoals.length > 0
-      ? Math.round(allGoals.reduce((acc, curr) => acc + curr.progress, 0) / allGoals.length)
+  const totalMinutes = logs.reduce((acc: number, p: DailyProgress) => acc + p.studyMinutes, 0);
+  const totalHours = (totalMinutes / 60).toFixed(1);
+  const completedTasksCount = tasks.filter((t: Task) => t.status === 'COMPLETED').length;
+  const taskCompletionRate = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : 0;
+  const avgGoalProgress =
+    goals.length > 0
+      ? Math.round(goals.reduce((acc: number, g: Goal) => acc + g.progress, 0) / goals.length)
       : 0;
 
-  // 7-day focus chart
-  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // 16-Week Heatmap matrix
+  const weeksCount = 16;
+  const daysInGrid = weeksCount * 7;
+  const today = new Date();
+  const heatmapData = Array.from({ length: daysInGrid }, (_, i) => {
+    const d = new Date();
+    d.setDate(today.getDate() - (daysInGrid - 1 - i));
+    const dateStr = d.toISOString().split('T')[0];
+    const log = logs.find((p: DailyProgress) => p.progressDate === dateStr);
+    const mins = log?.studyMinutes || 0;
+    return {
+      date: dateStr,
+      dayOfWeek: d.getDay(),
+      minutes: mins,
+    };
+  });
+
+  // Group by week
+  const weeks: typeof heatmapData[] = [];
+  for (let i = 0; i < heatmapData.length; i += 7) {
+    weeks.push(heatmapData.slice(i, i + 7));
+  }
+
+  // Trailing 7 days focus
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+    d.setDate(today.getDate() - (6 - i));
     const dateStr = d.toISOString().split('T')[0];
-    const dayLabel = daysOfWeek[d.getDay()];
-    const entry = allProgress.find((p) => p.progressDate === dateStr);
-    const minutes = entry ? entry.studyMinutes : 0;
-    return { dateStr, dayLabel, minutes };
+    const log = logs.find((p: DailyProgress) => p.progressDate === dateStr);
+    return {
+      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: dateStr,
+      minutes: log?.studyMinutes || 0,
+    };
   });
-  const maxFocus = Math.max(...last7Days.map((d) => d.minutes), 120);
-
-  // GitHub-style contribution heatmap (last 16 weeks / ~112 days)
-  const heatmapDays = useMemo(() => {
-    const totalDays = 112; // 16 weeks
-    const days = [];
-    const progressMap = new Map<string, number>();
-    allProgress.forEach((p) => {
-      progressMap.set(p.progressDate, (progressMap.get(p.progressDate) || 0) + p.studyMinutes);
-    });
-
-    for (let i = totalDays - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const minutes = progressMap.get(dateStr) || 0;
-      days.push({ dateStr, minutes, dayOfWeek: d.getDay() });
-    }
-    return days;
-  }, [allProgress]);
-
-  const getHeatmapColor = (minutes: number) => {
-    if (minutes === 0) return 'bg-slate-850 hover:bg-slate-700';
-    if (minutes < 60) return 'bg-primary-900/60 hover:bg-primary-800 text-primary-300';
-    if (minutes < 120) return 'bg-primary-700 hover:bg-primary-600';
-    if (minutes < 240) return 'bg-primary-500 hover:bg-primary-400';
-    return 'bg-indigo-400 hover:bg-indigo-300 shadow-glow';
-  };
-
-  const isLoading = isProgressLoading || isGoalsLoading || isTasksLoading || isAchievementsLoading;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* 1. Page Header */}
-      <div className="pb-2 border-b border-slate-850">
-        <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-primary-400" />
-          Productivity & Growth Analytics
+    <div className="space-y-4">
+      {/* 1. Header */}
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs">
+        <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-blue-600" />
+          Productivity & Velocity Analytics
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Deep performance metrics, focus distributions, and milestone completion velocity.
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          Comprehensive execution telemetry, focus heatmaps, and learning efficiency metrics
         </p>
       </div>
 
-      {/* 2. Top Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card hoverable>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Total Focus Time</span>
-            <Clock className="w-4 h-4 text-primary-400" />
+      {/* 2. Key Metrics Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+          <span className="text-[11px] font-bold uppercase text-slate-500 block">Total Focus Time</span>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+            {totalHours} <span className="text-xs font-normal text-slate-400">hours</span>
           </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">
-            {isLoading ? <Skeleton className="h-8 w-16" /> : formatMinutes(totalFocusMinutes)}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Across {allProgress.length} recorded sessions</p>
-        </Card>
+          <span className="text-[10px] text-slate-400">{logs.length} logged sessions</span>
+        </div>
 
-        <Card hoverable>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Average Session</span>
-            <Zap className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">
-            {isLoading ? <Skeleton className="h-8 w-16" /> : formatMinutes(averageFocusMinutes)}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">Peak session: {formatMinutes(highestFocusSession)}</p>
-        </Card>
+        <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+          <span className="text-[11px] font-bold uppercase text-slate-500 block">Task Velocity</span>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{taskCompletionRate}%</div>
+          <span className="text-[10px] text-slate-400">{completedTasksCount} of {tasks.length} tasks completed</span>
+        </div>
 
-        <Card hoverable>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Task Velocity</span>
-            <CheckSquare className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-400 mt-2">
-            {isLoading ? <Skeleton className="h-8 w-16" /> : `${taskCompletionRate}%`}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">{completedTasks} of {allTasks.length} completed</p>
-        </Card>
+        <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+          <span className="text-[11px] font-bold uppercase text-slate-500 block">Avg Goal Progress</span>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{avgGoalProgress}%</div>
+          <span className="text-[10px] text-slate-400">Across {goals.length} target milestones</span>
+        </div>
 
-        <Card hoverable>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Achievement Points</span>
-            <Medal className="w-4 h-4 text-primary-400" />
+        <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
+          <span className="text-[11px] font-bold uppercase text-slate-500 block">Achievement Points</span>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+            {pointsData?.totalPoints || 0} <span className="text-xs font-normal text-slate-400">pts</span>
           </div>
-          <div className="text-2xl font-bold text-slate-100 mt-2">
-            {isLoading ? <Skeleton className="h-8 w-16" /> : totalPointsData?.totalPoints || 0}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">{achievements.length} badges unlocked</p>
-        </Card>
+          <span className="text-[10px] text-slate-400">Verified platform badges</span>
+        </div>
       </div>
 
-      {/* 3. Developer Activity Heatmap */}
+      {/* 3. 16-Week Activity Heatmap */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-400" />
-              <CardTitle>Developer Activity Heatmap</CardTitle>
-            </div>
-            <span className="text-xs text-slate-400 font-mono">Last 16 Weeks</span>
-          </div>
+          <CardTitle>16-Week Consistency & Focus Heatmap</CardTitle>
+          <span className="text-[11px] text-slate-500">Trailing 112 Days</span>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 pt-2">
-            <div className="overflow-x-auto pb-2">
-              <div className="inline-grid grid-rows-7 grid-flow-col gap-1.5 min-w-[650px]">
-                {heatmapDays.map((day) => (
-                  <div
-                    key={day.dateStr}
-                    className={`w-3.5 h-3.5 rounded-sm transition-all ${getHeatmapColor(day.minutes)}`}
-                    title={`${formatDate(day.dateStr)}: ${day.minutes}m focus logged`}
-                  />
-                ))}
-              </div>
-            </div>
+          {isProgressLoading ? (
+            <Skeleton className="h-28 w-full" />
+          ) : (
+            <div>
+              <div className="overflow-x-auto pb-2">
+                <div className="flex gap-1 min-w-[650px]">
+                  {weeks.map((week, wIdx) => (
+                    <div key={wIdx} className="flex flex-col gap-1">
+                      {week.map((day) => {
+                        let bgClass = 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700';
+                        if (day.minutes > 120) {
+                          bgClass = 'bg-blue-700 border-blue-800';
+                        } else if (day.minutes > 60) {
+                          bgClass = 'bg-blue-600 border-blue-700';
+                        } else if (day.minutes > 30) {
+                          bgClass = 'bg-blue-400 border-blue-500';
+                        } else if (day.minutes > 0) {
+                          bgClass = 'bg-blue-200 border-blue-300';
+                        }
 
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-850">
-              <span>Contributions derived from recorded daily progress</span>
-              <div className="flex items-center gap-1.5">
-                <span>Less</span>
-                <div className="w-2.5 h-2.5 rounded-sm bg-slate-850" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-primary-900/60" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-primary-700" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-primary-500" />
-                <div className="w-2.5 h-2.5 rounded-sm bg-indigo-400" />
-                <span>More</span>
+                        return (
+                          <div
+                            key={day.date}
+                            className={`w-3.5 h-3.5 rounded-[1px] ${bgClass} transition-colors`}
+                            title={`${day.date}: ${day.minutes} minutes focus`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <span>16 Weeks Ago</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Less</span>
+                  <div className="w-2.5 h-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 rounded-[1px]" />
+                  <div className="w-2.5 h-2.5 bg-blue-200 rounded-[1px]" />
+                  <div className="w-2.5 h-2.5 bg-blue-400 rounded-[1px]" />
+                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-[1px]" />
+                  <div className="w-2.5 h-2.5 bg-blue-700 rounded-[1px]" />
+                  <span>More</span>
+                </div>
+                <span>Today</span>
               </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* 4. Focus Chart & Task Velocity Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 4. Focus Chart & Goal Health */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Weekly Focus Bar Chart */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary-400" />
-              <CardTitle>Weekly Focus Distribution</CardTitle>
-            </div>
+            <CardTitle>Trailing 7-Day Focus Minutes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-44 flex items-end justify-between gap-3 pt-4 px-2">
+            <div className="flex items-end justify-between gap-2 h-36 pt-4 pb-2">
               {last7Days.map((d) => {
-                const heightPercent = Math.max(Math.round((d.minutes / maxFocus) * 100), 8);
+                const heightPercent = Math.min(100, Math.max(8, Math.round((d.minutes / 180) * 100)));
                 return (
-                  <div key={d.dateStr} className="flex-1 flex flex-col items-center gap-2 group">
-                    <span className="text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {d.minutes}m
-                    </span>
-                    <div className="w-full max-w-[36px] bg-slate-800 rounded-t-lg h-28 flex items-end p-1">
-                      <div
-                        className="w-full rounded-md bg-gradient-to-t from-primary-600 to-indigo-400 transition-all duration-500"
-                        style={{ height: `${heightPercent}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium text-slate-400">{d.dayLabel}</span>
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{d.minutes}m</span>
+                    <div
+                      className="w-full bg-blue-700 hover:bg-blue-600 rounded-[2px] transition-all"
+                      style={{ height: `${heightPercent}%` }}
+                    />
+                    <span className="text-[10px] font-semibold text-slate-500">{d.day}</span>
                   </div>
                 );
               })}
@@ -249,140 +204,29 @@ export const AnalyticsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Task Velocity Distribution */}
+        {/* Goal Execution Breakdown */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-emerald-400" />
-              <CardTitle>Task Execution Breakdown</CardTitle>
-            </div>
+            <CardTitle>Milestone Health Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4 pt-1">
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Completed
-                  </span>
-                  <span className="font-semibold text-slate-100">{completedTasks}</span>
+          <CardContent className="space-y-3">
+            {goals.slice(0, 4).map((g: Goal) => (
+              <div key={g.id} className="p-2.5 bg-[#f8fafc] dark:bg-slate-800/60 border border-[#e2e8f0] dark:border-slate-700 rounded-[2px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{g.title}</span>
+                  <Badge size="sm" variant="primary">
+                    {g.progress}%
+                  </Badge>
                 </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-400 rounded-full"
-                    style={{ width: `${allTasks.length > 0 ? (completedTasks / allTasks.length) * 100 : 0}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-slate-300 pt-1">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-primary-400" /> In Progress
-                  </span>
-                  <span className="font-semibold text-slate-100">{inProgressTasks}</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full bg-primary-400 rounded-full"
-                    style={{ width: `${allTasks.length > 0 ? (inProgressTasks / allTasks.length) * 100 : 0}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-slate-300 pt-1">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-500" /> To Do
-                  </span>
-                  <span className="font-semibold text-slate-100">{todoTasks}</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full bg-slate-500 rounded-full"
-                    style={{ width: `${allTasks.length > 0 ? (todoTasks / allTasks.length) * 100 : 0}%` }}
-                  />
-                </div>
-
-                {overdueTasks > 0 && (
-                  <div className="flex items-center justify-between text-rose-400 pt-1 font-semibold">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Overdue Tasks
-                    </span>
-                    <span>{overdueTasks}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 5. Goals Health & Achievements Categories */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Goal Health Status */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-indigo-400" />
-              <CardTitle>Goal Progress & Completion</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                <div>
-                  <span className="font-bold text-slate-100 block">Average Goal Progress</span>
-                  <span className="text-slate-500 text-[11px]">Across {allGoals.length} total goals</span>
-                </div>
-                <span className="text-lg font-bold text-primary-400">{averageGoalProgress}%</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Active Goals</span>
-                  <span className="text-base font-bold text-slate-100 mt-1 block">{activeGoals.length}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] uppercase font-semibold">Completed Goals</span>
-                  <span className="text-base font-bold text-emerald-400 mt-1 block">{completedGoals}</span>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-[2px] mt-1.5 overflow-hidden">
+                  <div className="bg-blue-600 h-full rounded-[2px]" style={{ width: `${g.progress}%` }} />
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            ))}
 
-        {/* Achievements Category Breakdown */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Medal className="w-4 h-4 text-amber-400" />
-              <CardTitle>Milestones & Badges</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {achievements.length > 0 ? (
-                achievements.map((ach) => (
-                  <div
-                    key={ach.id}
-                    className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-primary-950 border border-primary-800 flex items-center justify-center text-primary-300 font-bold shrink-0">
-                        🏆
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-100 truncate">{ach.title}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{ach.type}</p>
-                      </div>
-                    </div>
-                    <Badge size="sm" variant="warning">
-                      +{ach.points} pts
-                    </Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500 text-center py-6">
-                  No badges unlocked yet. Keep logging progress and solving tasks to earn points!
-                </p>
-              )}
-            </div>
+            {goals.length === 0 && (
+              <p className="text-xs text-slate-500 italic text-center py-4">No active milestones recorded.</p>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,49 +1,90 @@
 import React, { HTMLAttributes } from 'react';
-import { cn } from '@/lib/utils';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  variant?: 'default' | 'flat';
   hoverable?: boolean;
 }
 
-export const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, hoverable = false, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm shadow-subtle',
-          hoverable && 'transition-all duration-200 hover:border-slate-700/80 hover:bg-slate-900/90 hover:shadow-elevated',
+export const Card: React.FC<CardProps> = ({ children, className, hoverable, ...props }) => {
+  return (
+    <div
+      className={twMerge(
+        clsx(
+          'bg-white dark:bg-[#111827] border border-[#cfd5dc] dark:border-slate-800 rounded-[3px] shadow-xs overflow-hidden',
+          hoverable && 'hover:border-blue-500 transition-colors',
           className
-        )}
-        {...props}
-      />
-    );
-  }
-);
-Card.displayName = 'Card';
+        )
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
 
-export const CardHeader = React.forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center justify-between pb-4 border-b border-slate-800/60 mb-4', className)} {...props} />
-  )
-);
-CardHeader.displayName = 'CardHeader';
+export const CardHeader: React.FC<HTMLAttributes<HTMLDivElement>> = ({
+  children,
+  className,
+  ...props
+}) => {
+  return (
+    <div
+      className={twMerge(
+        clsx(
+          'bg-[#f8fafc] dark:bg-slate-800/80 border-b border-[#cfd5dc] dark:border-slate-800 px-3.5 py-2 flex items-center justify-between',
+          className
+        )
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
 
-export const CardTitle = React.forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn('text-base font-semibold text-slate-100 tracking-tight', className)} {...props} />
-  )
-);
-CardTitle.displayName = 'CardTitle';
+export const CardTitle: React.FC<HTMLAttributes<HTMLHeadingElement>> = ({
+  children,
+  className,
+  ...props
+}) => {
+  return (
+    <h3
+      className={twMerge(
+        clsx('text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200', className)
+      )}
+      {...props}
+    >
+      {children}
+    </h3>
+  );
+};
 
-export const CardDescription = React.forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-xs text-slate-400 mt-0.5', className)} {...props} />
-  )
-);
-CardDescription.displayName = 'CardDescription';
+export const CardContent: React.FC<HTMLAttributes<HTMLDivElement>> = ({
+  children,
+  className,
+  ...props
+}) => {
+  return <div className={twMerge(clsx('p-3.5', className))} {...props}>{children}</div>;
+};
 
-export const CardContent = React.forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn('space-y-4', className)} {...props} />
-);
-CardContent.displayName = 'CardContent';
+export const CardFooter: React.FC<HTMLAttributes<HTMLDivElement>> = ({
+  children,
+  className,
+  ...props
+}) => {
+  return (
+    <div
+      className={twMerge(
+        clsx(
+          'bg-[#f8fafc] dark:bg-slate-800/60 border-t border-[#cfd5dc] dark:border-slate-800 px-3.5 py-2.5',
+          className
+        )
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};

@@ -19,7 +19,19 @@ export const reminderApi = {
   },
 
   createReminder: async (data: CreateReminderRequest): Promise<Reminder> => {
-    const res = await apiClient.post<ApiResponse<Reminder>>('/reminders', data);
+    // Default endDate to 1 year ahead if omitted by user
+    let endDate = data.endDate;
+    if (!endDate) {
+      const d = new Date(data.startDate || new Date().toISOString().split('T')[0]);
+      d.setFullYear(d.getFullYear() + 1);
+      endDate = d.toISOString().split('T')[0];
+    }
+
+    const payload = {
+      ...data,
+      endDate,
+    };
+    const res = await apiClient.post<ApiResponse<Reminder>>('/reminders', payload);
     return res.data.data;
   },
 

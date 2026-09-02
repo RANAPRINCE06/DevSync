@@ -1,18 +1,20 @@
-import React, { ButtonHTMLAttributes } from 'react';
-import { cn } from '@/lib/utils';
+import React, { ButtonHTMLAttributes, ReactNode } from 'react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { Loader2 } from 'lucide-react';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success' | 'ghost';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'icon';
   isLoading?: boolean;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
+      children,
       className,
       variant = 'primary',
       size = 'md',
@@ -20,45 +22,50 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       leftIcon,
       rightIcon,
       disabled,
-      children,
       ...props
     },
     ref
   ) => {
+    const baseStyles =
+      'inline-flex items-center justify-center font-semibold rounded-[3px] transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs border select-none';
+
     const variants = {
-      primary: 'bg-primary-600 hover:bg-primary-500 text-white shadow-sm shadow-primary-900/50 focus-visible:ring-primary-500',
-      secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700/60 focus-visible:ring-slate-400',
-      outline: 'border border-slate-700 bg-transparent hover:bg-slate-800/80 text-slate-200 focus-visible:ring-slate-400',
-      ghost: 'bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-slate-100 focus-visible:ring-slate-400',
-      danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-sm shadow-rose-900/50 focus-visible:ring-rose-500',
+      primary:
+        'bg-[#1d4ed8] hover:bg-[#1e40af] text-white border-[#1e40af] dark:bg-blue-600 dark:hover:bg-blue-700 dark:border-blue-700',
+      secondary:
+        'bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] border-[#cbd5e1] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-600',
+      outline:
+        'bg-white hover:bg-[#f8fafc] text-[#334155] border-[#cbd5e1] dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
+      danger:
+        'bg-[#dc2626] hover:bg-[#b91c1c] text-white border-[#b91c1c] dark:bg-red-600 dark:hover:bg-red-700',
+      success:
+        'bg-[#16a34a] hover:bg-[#15803d] text-white border-[#15803d] dark:bg-emerald-600 dark:hover:bg-emerald-700',
+      ghost:
+        'bg-transparent hover:bg-slate-100 text-[#334155] border-transparent shadow-none dark:hover:bg-slate-800 dark:text-slate-300',
     };
 
     const sizes = {
-      sm: 'h-8 px-3 text-xs rounded-lg gap-1.5',
-      md: 'h-9 px-4 text-sm rounded-xl gap-2',
-      lg: 'h-11 px-5 text-base rounded-xl gap-2.5',
-      icon: 'h-9 w-9 p-0 rounded-xl justify-center',
+      xs: 'px-2 py-0.5 text-[11px] gap-1',
+      sm: 'px-2.5 py-1 text-xs gap-1.5',
+      md: 'px-3 py-1.5 text-xs gap-2',
+      lg: 'px-4 py-2 text-sm gap-2',
+      icon: 'p-1.5 text-xs gap-0',
     };
 
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
-        className={cn(
-          'inline-flex items-center justify-center font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
-          variants[variant],
-          sizes[size],
-          className
-        )}
+        className={twMerge(clsx(baseStyles, variants[variant], sizes[size], className))}
         {...props}
       >
         {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
         ) : (
-          leftIcon && <span className="shrink-0">{leftIcon}</span>
+          leftIcon && <span className="inline-flex shrink-0">{leftIcon}</span>
         )}
         {children}
-        {!isLoading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
+        {!isLoading && rightIcon && <span className="inline-flex shrink-0">{rightIcon}</span>}
       </button>
     );
   }
