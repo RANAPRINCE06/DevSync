@@ -1,4 +1,5 @@
-import { userApi } from './userApi';
+import { apiClient } from './client';
+import { ApiResponse } from '@/types/api';
 import { User, UpdateUserRequest } from '@/types/user';
 import { LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth';
 
@@ -7,43 +8,32 @@ const USER_STORAGE_KEY = 'devsync_auth_user';
 
 export const authApi = {
   login: async (request: LoginRequest): Promise<AuthResponse> => {
-    // 1. Fetch available users to verify account
-    const usersPage = await userApi.getUsers({ size: 100 });
-    const matchedUser = usersPage.content?.find(
-      (u) => u.email.toLowerCase() === request.email.toLowerCase()
-    );
+    const res = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', {
+      email: request.email.trim(),
+      password: request.password,
+    });
 
-    if (!matchedUser) {
-      throw new Error('Account not found. Please register or check your email address.');
-    }
-
-    if (!matchedUser.active) {
-      throw new Error('This account has been deactivated. Please contact your team administrator.');
-    }
-
-    // 2. Generate a secure session token
-    const token = `devsync_token_${matchedUser.id}_${Date.now()}`;
+    const authData = res.data.data;
     const storage = request.rememberMe !== false ? localStorage : sessionStorage;
-    storage.setItem(TOKEN_STORAGE_KEY, token);
-    storage.setItem(USER_STORAGE_KEY, JSON.stringify(matchedUser));
+    storage.setItem(TOKEN_STORAGE_KEY, authData.token);
+    storage.setItem(USER_STORAGE_KEY, JSON.stringify(authData.user));
 
-    return { user: matchedUser, token };
+    return authData;
   },
 
   register: async (request: RegisterRequest): Promise<AuthResponse> => {
-    // 1. Create user in database via backend API
-    const user = await userApi.createUser({
-      name: request.name,
-      email: request.email,
+    const res = await apiClient.post<ApiResponse<AuthResponse>>('/auth/register', {
+      name: request.name.trim(),
+      email: request.email.trim(),
+      password: request.password,
       timezone: request.timezone || 'UTC',
     });
 
-    // 2. Generate session token
-    const token = `devsync_token_${user.id}_${Date.now()}`;
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    const authData = res.data.data;
+    localStorage.setItem(TOKEN_STORAGE_KEY, authData.token);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authData.user));
 
-    return { user, token };
+    return authData;
   },
 
   logout: async (): Promise<void> => {
@@ -68,8 +58,8 @@ export const authApi = {
   },
 
   updateProfile: async (id: string, data: UpdateUserRequest): Promise<User> => {
-    const updated = await userApi.updateUser(id, data);
-    // Update cached user in storage
+    const res = await apiClient.put<ApiResponse<User>>(`/users/${id}`, data);
+    const updated = res.data.data;
     const current = authApi.getCurrentUser();
     if (current && current.id === id) {
       const merged = { ...current, ...updated };

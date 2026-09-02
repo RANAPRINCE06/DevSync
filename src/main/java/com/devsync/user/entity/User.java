@@ -19,6 +19,9 @@ public class User {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @Column(name = "avatar_url")
     private String avatarUrl;
 
@@ -37,10 +40,11 @@ public class User {
     public User() {
     }
 
-    public User(UUID id, String name, String email, String avatarUrl, String timezone, boolean active, Instant createdAt, Instant updatedAt) {
+    public User(UUID id, String name, String email, String passwordHash, String avatarUrl, String timezone, boolean active, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.email = email;
+        this.passwordHash = passwordHash;
         this.avatarUrl = avatarUrl;
         this.timezone = timezone;
         this.active = active;
@@ -82,6 +86,14 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public String getAvatarUrl() {
@@ -132,6 +144,7 @@ public class User {
         private UUID id;
         private String name;
         private String email;
+        private String passwordHash;
         private String avatarUrl;
         private String timezone;
         private boolean active = true;
@@ -150,6 +163,11 @@ public class User {
 
         public UserBuilder email(String email) {
             this.email = email;
+            return this;
+        }
+
+        public UserBuilder passwordHash(String passwordHash) {
+            this.passwordHash = passwordHash;
             return this;
         }
 
@@ -179,7 +197,7 @@ public class User {
         }
 
         public User build() {
-            return new User(id, name, email, avatarUrl, timezone, active, createdAt, updatedAt);
+            return new User(id, name, email, passwordHash, avatarUrl, timezone, active, createdAt, updatedAt);
         }
     }
 }

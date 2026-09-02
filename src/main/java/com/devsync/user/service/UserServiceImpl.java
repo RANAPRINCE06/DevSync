@@ -1,5 +1,6 @@
 package com.devsync.user.service;
 
+import com.devsync.auth.util.PasswordUtil;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.user.dto.CreateUserRequest;
@@ -37,9 +38,15 @@ public class UserServiceImpl implements UserService {
             throw new BadRequestException("User with email '" + normalizedEmail + "' already exists");
         }
 
+        String passwordHash = null;
+        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            passwordHash = PasswordUtil.hashPassword(request.getPassword().trim());
+        }
+
         User user = User.builder()
                 .name(trimmedName)
                 .email(normalizedEmail)
+                .passwordHash(passwordHash)
                 .avatarUrl(request.getAvatarUrl() != null ? request.getAvatarUrl().trim() : null)
                 .timezone(timezone)
                 .active(true)

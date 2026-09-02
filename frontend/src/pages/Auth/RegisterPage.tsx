@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -13,13 +12,59 @@ export const RegisterPage: React.FC = () => {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const validateForm = (): boolean => {
+    let isValid = true;
+    setNameError('');
+    setEmailError('');
+    setPasswordError('');
+    setErrorMessage('');
+
+    if (!name.trim()) {
+      setNameError('Name is required');
+      isValid = false;
+    } else if (name.trim().length < 2) {
+      setNameError('Name must be at least 2 characters');
+      isValid = false;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        setEmailError('Please enter a valid email address');
+        isValid = false;
+      }
+    }
+
+    if (!password) {
+      setPasswordError('Password is required');
+      isValid = false;
+    } else if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      isValid = false;
+    }
+
+    return isValid;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -27,6 +72,7 @@ export const RegisterPage: React.FC = () => {
       await register({
         name: name.trim(),
         email: email.trim(),
+        password,
         timezone,
       });
       showToast('success', 'Account registered successfully! Welcome to DevSync.');
@@ -54,7 +100,7 @@ export const RegisterPage: React.FC = () => {
               <span className="text-[9px] uppercase tracking-widest text-blue-200 block">Developer Portal</span>
             </div>
           </div>
-          <span className="text-[10px] text-blue-200 font-semibold uppercase">New Account</span>
+          <span className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">New Account</span>
         </div>
 
         {/* Form Body */}
@@ -73,37 +119,96 @@ export const RegisterPage: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            <Input
-              label="Full Name *"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex Mercer"
-              required
-            />
+          <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (nameError) setNameError('');
+                }}
+                placeholder="e.g. Alex Mercer"
+                className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border ${
+                  nameError ? 'border-red-500' : 'border-[#cbd5e1] dark:border-slate-700 focus:border-blue-600'
+                } rounded-[2px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none`}
+                required
+              />
+              {nameError && <p className="text-[11px] text-red-600 font-semibold mt-0.5">{nameError}</p>}
+            </div>
 
-            <Input
-              label="Developer Email Address *"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. alex@devsync.io"
-              required
-            />
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
+                Developer Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError('');
+                }}
+                placeholder="e.g. alex@devsync.io"
+                className={`w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border ${
+                  emailError ? 'border-red-500' : 'border-[#cbd5e1] dark:border-slate-700 focus:border-blue-600'
+                } rounded-[2px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none`}
+                required
+              />
+              {emailError && <p className="text-[11px] text-red-600 font-semibold mt-0.5">{emailError}</p>}
+            </div>
 
-            <Input
-              label="Timezone *"
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              placeholder="e.g. UTC, Asia/Kolkata"
-              required
-            />
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError('');
+                  }}
+                  placeholder="Min. 6 characters"
+                  className={`w-full pl-2.5 pr-8 py-1.5 text-xs bg-white dark:bg-slate-900 border ${
+                    passwordError ? 'border-red-500' : 'border-[#cbd5e1] dark:border-slate-700 focus:border-blue-600'
+                  } rounded-[2px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {passwordError && <p className="text-[11px] text-red-600 font-semibold mt-0.5">{passwordError}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
+                Timezone
+              </label>
+              <input
+                type="text"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                placeholder="e.g. UTC, Asia/Kolkata"
+                className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-[#cbd5e1] dark:border-slate-700 rounded-[2px] text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+              />
+            </div>
 
             <Button
               type="submit"
               variant="primary"
               size="md"
-              className="w-full"
+              className="w-full mt-2"
               isLoading={isLoading}
               rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
             >

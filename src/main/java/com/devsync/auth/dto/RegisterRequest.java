@@ -1,11 +1,11 @@
-package com.devsync.user.dto;
+package com.devsync.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public class CreateUserRequest {
+public class RegisterRequest {
 
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
@@ -13,34 +13,30 @@ public class CreateUserRequest {
     private String name;
 
     @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
-    @Schema(example = "prince@example.com")
+    @Email(message = "Please enter a valid email address")
+    @Schema(example = "developer@devsync.io")
     private String email;
 
+    @NotBlank(message = "Password is required")
     @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
-    @Schema(example = "SecurePass123")
+    @Schema(example = "SecurePass123!")
     private String password;
 
     @Schema(example = "https://example.com/avatar.jpg")
     private String avatarUrl;
 
-    @NotBlank(message = "Timezone is required")
     @Schema(example = "Asia/Kolkata")
     private String timezone;
 
-    public CreateUserRequest() {
+    public RegisterRequest() {
     }
 
-    public CreateUserRequest(String name, String email, String password, String avatarUrl, String timezone) {
+    public RegisterRequest(String name, String email, String password, String avatarUrl, String timezone) {
         this.name = name;
         this.email = email;
         this.password = password;
         this.avatarUrl = avatarUrl;
         this.timezone = timezone;
-    }
-
-    public CreateUserRequest(String name, String email, String avatarUrl, String timezone) {
-        this(name, email, null, avatarUrl, timezone);
     }
 
     public String getName() {
@@ -83,44 +79,44 @@ public class CreateUserRequest {
         this.timezone = timezone;
     }
 
-    public static CreateUserRequestBuilder builder() {
-        return new CreateUserRequestBuilder();
+    public static RegisterRequestBuilder builder() {
+        return new RegisterRequestBuilder();
     }
 
-    public static class CreateUserRequestBuilder {
+    public static class RegisterRequestBuilder {
         private String name;
         private String email;
         private String password;
         private String avatarUrl;
         private String timezone;
 
-        public CreateUserRequestBuilder name(String name) {
+        public RegisterRequestBuilder name(String name) {
             this.name = name;
             return this;
         }
 
-        public CreateUserRequestBuilder email(String email) {
+        public RegisterRequestBuilder email(String email) {
             this.email = email;
             return this;
         }
 
-        public CreateUserRequestBuilder password(String password) {
+        public RegisterRequestBuilder password(String password) {
             this.password = password;
             return this;
         }
 
-        public CreateUserRequestBuilder avatarUrl(String avatarUrl) {
+        public RegisterRequestBuilder avatarUrl(String avatarUrl) {
             this.avatarUrl = avatarUrl;
             return this;
         }
 
-        public CreateUserRequestBuilder timezone(String timezone) {
+        public RegisterRequestBuilder timezone(String timezone) {
             this.timezone = timezone;
             return this;
         }
 
-        public CreateUserRequest build() {
-            return new CreateUserRequest(name, email, password, avatarUrl, timezone);
+        public RegisterRequest build() {
+            return new RegisterRequest(name, email, password, avatarUrl, timezone);
         }
     }
 }
