@@ -1,5 +1,1 @@
-com.devsync.config.DevSyncPasswordEncoder
-com.devsync.config.DevSyncAuthenticationEntryPoint
-com.devsync.config.DevSyncAccessDeniedHandler
-com.devsync.config.SecurityConfig
 

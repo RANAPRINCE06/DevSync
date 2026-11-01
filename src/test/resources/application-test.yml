@@ -11,3 +11,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+# JWT test configuration — values are for testing only and must never be used in production.
+# Secret is a Base64-encoded 48-byte value (384 bits), satisfying HMAC-SHA256 minimum requirements.
+app:
+  jwt:
+    secret: dGVzdC1kZXZzeW5jLWp3dC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW9ubHktZG8tbm90LXVzZS1pbi1wcm9k
+    expiration-ms: 3600000

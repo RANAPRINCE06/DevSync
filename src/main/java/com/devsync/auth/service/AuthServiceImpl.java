@@ -3,6 +3,7 @@ package com.devsync.auth.service;
 import com.devsync.auth.dto.AuthResponse;
 import com.devsync.auth.dto.LoginRequest;
 import com.devsync.auth.dto.RegisterRequest;
+import com.devsync.auth.security.JwtTokenProvider;
 import com.devsync.auth.util.PasswordUtil;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
@@ -14,16 +15,41 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
+/**
+ * Authentication service implementation (Phase A2).
+ *
+ * <p>Changes from Phase A1:
+ * <ul>
+ *   <li>Login and registration now generate a genuine HMAC-SHA256 signed JWT via
+ *       {@link JwtTokenProvider} instead of the previous pseudo-token string.</li>
+ *   <li>All password operations continue to use the existing PBKDF2-SHA256 implementation
+ *       in {@link PasswordUtil}, preserving 100% backward compatibility with stored hashes.</li>
+ *   <li>The {@code JwtTokenProvider} dependency is constructor-injected for testability.</li>
+ * </ul>
+ *
+ * <p>Role assignment: the current schema has no role column on the {@code users} table.
+ * All users are assigned the {@code "USER"} role at token generation time.
+ * An ADMIN role claim will be introduced in Phase A3 when the role column is added.
+ */
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final UserRepository userRepository;
+    private static final List<String> DEFAULT_USER_ROLES = List.of("USER");
 
-    public AuthServiceImpl(UserRepository userRepository) {
+    private final UserRepository userRepository;
+    private final JwtTokenProvider jwtTokenProvider;
+
+    public AuthServiceImpl(UserRepository userRepository, JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
+
+    // -------------------------------------------------------------------------
+    // Login
+    // -------------------------------------------------------------------------
 
     @Override
     @Transactional
@@ -45,21 +71,26 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("This account has been deactivated. Please contact your team administrator.");
         }
 
-        // Verify password hash
+        // Verify PBKDF2 password hash — compatible with all previously stored hashes.
         if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
             boolean matches = PasswordUtil.verifyPassword(rawPassword, user.getPasswordHash());
             if (!matches) {
                 throw new UnauthorizedException("Invalid email or password");
             }
         } else {
-            // First time password setup for legacy user without password hash
+            // Legacy user without password hash — set hash on first successful login.
             user.setPasswordHash(PasswordUtil.hashPassword(rawPassword));
             userRepository.save(user);
         }
 
-        String token = "devsync_auth_" + user.getId() + "_" + UUID.randomUUID().toString().replace("-", "");
+        // Generate a genuine signed JWT using the verified user identity from the database.
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), DEFAULT_USER_ROLES);
         return AuthResponse.of(UserResponse.fromEntity(user), token);
     }
+
+    // -------------------------------------------------------------------------
+    // Registration
+    // -------------------------------------------------------------------------
 
     @Override
     @Transactional
@@ -88,9 +119,15 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
-        String token = "devsync_auth_" + savedUser.getId() + "_" + UUID.randomUUID().toString().replace("-", "");
+
+        // Generate a genuine signed JWT for the newly registered user.
+        String token = jwtTokenProvider.generateToken(savedUser.getId(), savedUser.getEmail(), DEFAULT_USER_ROLES);
         return AuthResponse.of(UserResponse.fromEntity(savedUser), token);
     }
+
+    // -------------------------------------------------------------------------
+    // Profile retrieval
+    // -------------------------------------------------------------------------
 
     @Override
     @Transactional(readOnly = true)
@@ -100,9 +137,14 @@ public class AuthServiceImpl implements AuthService {
         return UserResponse.fromEntity(user);
     }
 
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
     private void validateTimezone(String timezone) {
         if (!ZoneId.getAvailableZoneIds().contains(timezone)) {
-            throw new BadRequestException("Invalid IANA timezone: '" + timezone + "'. Example valid timezones: 'Asia/Kolkata', 'America/New_York', 'Europe/London'");
+            throw new BadRequestException("Invalid IANA timezone: '" + timezone +
+                    "'. Example valid timezones: 'Asia/Kolkata', 'America/New_York', 'Europe/London'");
         }
     }
 }

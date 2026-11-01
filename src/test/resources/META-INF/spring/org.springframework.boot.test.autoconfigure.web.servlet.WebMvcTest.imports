@@ -2,4 +2,5 @@ com.devsync.config.SecurityConfig
 com.devsync.config.DevSyncPasswordEncoder
 com.devsync.config.DevSyncAuthenticationEntryPoint
 com.devsync.config.DevSyncAccessDeniedHandler
-
+com.devsync.auth.security.JwtTokenProvider
+com.devsync.auth.security.JwtAuthenticationFilter

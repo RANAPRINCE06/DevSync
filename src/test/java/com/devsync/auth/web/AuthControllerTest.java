@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -141,6 +142,7 @@ class AuthControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("GET /api/v1/auth/me/{userId} - returns 200 OK")
     void getProfile_Returns200() throws Exception {
         UUID userId = UUID.randomUUID();

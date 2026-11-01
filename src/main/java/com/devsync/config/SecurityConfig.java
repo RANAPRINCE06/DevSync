@@ -1,6 +1,8 @@
 package com.devsync.config;
 
-import org.springframework.boot.autoconfigure.AutoConfiguration;
+import com.devsync.auth.security.JwtAuthenticationFilter;
+import com.devsync.auth.security.JwtProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,6 +17,7 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,55 +25,71 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Spring Security Foundation Configuration (Phase A1).
+ * Spring Security Configuration — Phase A2: Real JWT Authentication.
  *
- * Establishes a stateless REST architecture with custom entry points, CORS,
- * secure HTTP headers, and explicit route definitions.
+ * <p>Changes from Phase A1:
+ * <ul>
+ *   <li>Removed the transitional {@code .requestMatchers("/api/v1/**").permitAll()} rule.</li>
+ *   <li>All business API endpoints under {@code /api/v1/**} now require valid JWT authentication.</li>
+ *   <li>{@link JwtAuthenticationFilter} is installed before
+ *       {@link UsernamePasswordAuthenticationFilter} to populate the SecurityContext on every
+ *       request that carries a valid Bearer token.</li>
+ * </ul>
  *
- * TRANSITIONAL ARCHITECTURE NOTICE:
- * In Phase A1, tokens are pseudo-bearer strings ('devsync_auth_*'). No JWT verification
- * filter exists yet (scheduled for Phase A2). To preserve backward compatibility and avoid
- * breaking current frontend functionality, existing business APIs under '/api/v1/**' are
- * accessible during this transition, while explicitly defined public routes, administrative
- * routes, and protected security test boundaries are strictly enforced.
+ * <p>Public endpoints (no token required):
+ * <ul>
+ *   <li>{@code POST /api/v1/auth/login}</li>
+ *   <li>{@code POST /api/v1/auth/register}</li>
+ *   <li>{@code OPTIONS /**} — CORS preflight</li>
+ *   <li>Swagger UI and OpenAPI documentation</li>
+ *   <li>Actuator health and info</li>
+ * </ul>
+ *
+ * <p>Phase A3 note: JWT establishes who the caller is. It does not yet verify that the caller
+ * owns the requested resource (task, goal, team record, etc.). Object-level authorization
+ * is implemented in Phase A3.
  */
-@AutoConfiguration
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     private final DevSyncAuthenticationEntryPoint authenticationEntryPoint;
     private final DevSyncAccessDeniedHandler accessDeniedHandler;
     private final DevSyncPasswordEncoder passwordEncoder;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     public SecurityConfig(DevSyncAuthenticationEntryPoint authenticationEntryPoint,
                           DevSyncAccessDeniedHandler accessDeniedHandler,
-                          DevSyncPasswordEncoder passwordEncoder) {
+                          DevSyncPasswordEncoder passwordEncoder,
+                          JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
         this.passwordEncoder = passwordEncoder;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Stateless REST API - Disable CSRF (Stateless Bearer Tokens, no session cookies)
+                // 1. Stateless REST API — CSRF disabled (bearer-token architecture, no session cookies)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // 2. Cross-Origin Resource Sharing (CORS) Integration
+                // 2. CORS — aligned with React dev server ports
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 3. Stateless Session Management (No HttpSession stored on server)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 3. Stateless session — no HttpSession created or stored
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 4. Custom Security Exception Handling (Structured JSON responses)
+                // 4. Structured JSON error responses
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
                 )
 
-                // 5. Standard HTTP Security Headers
+                // 5. HTTP Security Headers
                 .headers(headers -> headers
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
                         .contentTypeOptions(Customizer.withDefaults())
@@ -79,14 +98,14 @@ public class SecurityConfig {
 
                 // 6. Request Authorization Rules
                 .authorizeHttpRequests(auth -> auth
-                        // CORS Preflight requests
+                        // CORS Preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Public Authentication Routes
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
 
-                        // Public API Documentation & Swagger UI
+                        // Swagger / OpenAPI Documentation
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
@@ -94,21 +113,19 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        // Actuator Health & Info
+                        // Actuator — health and info are public; all others require ADMIN
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
 
-                        // Explicitly Protected Administrative Endpoints (RBAC)
+                        // Administrative Endpoints — ADMIN role required
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
-                        // Explicitly Protected Boundary Endpoints (Phase A1 Security Enforcement)
-                        .requestMatchers("/api/v1/protected/**").authenticated()
-
-                        // Transitional API Routes: Accessible in Phase A1 until Phase A2 installs JwtAuthenticationFilter
-                        .requestMatchers("/api/v1/**").permitAll()
-
-                        // Default Fallback: Any other unmapped route requires authentication
+                        // All remaining API endpoints require a valid, verified JWT
                         .anyRequest().authenticated()
-                );
+                )
+
+                // 7. Install JWT filter before UsernamePasswordAuthenticationFilter
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

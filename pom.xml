@@ -53,6 +53,25 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- JJWT — JSON Web Token (compile-time API + runtime implementation) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Database Migration - Flyway -->
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -115,6 +134,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>-javaagent:"C:/Users/Prince/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar" -XX:+EnableDynamicAgentLoading</argLine>
+                    <environmentVariables>
+                        <JWT_SECRET>dGVzdC1kZXZzeW5jLWp3dC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW9ubHktZG8tbm90LXVzZS1pbi1wcm9k</JWT_SECRET>
+                        <JWT_EXPIRATION>86400000</JWT_EXPIRATION>
+                    </environmentVariables>
                 </configuration>
             </plugin>
             <plugin>
