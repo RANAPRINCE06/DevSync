@@ -1,5 +1,6 @@
 package com.devsync.task.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.goal.entity.Goal;
@@ -20,6 +21,7 @@ import com.devsync.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,30 +37,39 @@ public class TaskServiceImpl implements TaskService {
     private final GoalRepository goalRepository;
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     public TaskServiceImpl(
             TaskRepository taskRepository,
             GoalRepository goalRepository,
             UserRepository userRepository,
-            TeamMemberRepository teamMemberRepository) {
+            TeamMemberRepository teamMemberRepository,
+            CurrentUserProvider currentUserProvider) {
         this.taskRepository = taskRepository;
         this.goalRepository = goalRepository;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Override
     @Transactional
     public TaskResponse createTask(CreateTaskRequest request) {
-        Goal goal = goalRepository.findById(request.getGoalId())
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+
+        if (request.getAssigneeId() != null && !request.getAssigneeId().equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot assign task to another user");
+        }
+
+        Goal goal = goalRepository.findByIdAndOwnerId(request.getGoalId(), currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + request.getGoalId()));
 
         if (!goal.isActive()) {
             throw new BadRequestException("Cannot create a task for an inactive goal");
         }
 
-        User assignee = userRepository.findById(request.getAssigneeId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getAssigneeId()));
+        User assignee = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + currentUserId));
 
         Team team = goal.getTeam();
 
@@ -97,7 +108,8 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public TaskResponse getTaskById(UUID id) {
-        Task task = taskRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Task task = taskRepository.findByIdAndGoalOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
         return TaskResponse.fromEntity(task);
     }
@@ -105,7 +117,8 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskResponse updateTask(UUID id, UpdateTaskRequest request) {
-        Task task = taskRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Task task = taskRepository.findByIdAndGoalOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
 
         if (request.getDueDate() != null && task.getGoal().getStartDate() != null && request.getDueDate().isBefore(task.getGoal().getStartDate())) {
@@ -136,7 +149,8 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public void deactivateTask(UUID id) {
-        Task task = taskRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Task task = taskRepository.findByIdAndGoalOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
         task.setActive(false);
         taskRepository.save(task);
@@ -154,8 +168,19 @@ public class TaskServiceImpl implements TaskService {
             Boolean active,
             Pageable pageable) {
 
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+
+        if (assigneeId != null && !assigneeId.equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot view tasks of another user");
+        }
+
+        if (goalId != null) {
+            goalRepository.findByIdAndOwnerId(goalId, currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+        }
+
         Boolean activeFilter = active != null ? active : true;
-        Specification<Task> spec = TaskSpecification.filter(goalId, assigneeId, teamId, status, priority, dueDate, activeFilter);
+        Specification<Task> spec = TaskSpecification.filter(goalId, assigneeId, teamId, status, priority, dueDate, activeFilter, currentUserId);
         return taskRepository.findAll(spec, pageable).map(TaskResponse::fromEntity);
     }
 }

@@ -38,6 +38,10 @@ public class TaskSpecification {
         return (root, query, cb) -> active == null ? null : cb.equal(root.get("active"), active);
     }
 
+    public static Specification<Task> withGoalOwnerId(UUID ownerId) {
+        return (root, query, cb) -> ownerId == null ? null : cb.equal(root.get("goal").get("owner").get("id"), ownerId);
+    }
+
     public static Specification<Task> filter(
             UUID goalId,
             UUID assigneeId,
@@ -46,12 +50,25 @@ public class TaskSpecification {
             TaskPriority priority,
             LocalDate dueDate,
             Boolean active) {
+        return filter(goalId, assigneeId, teamId, status, priority, dueDate, active, null);
+    }
+
+    public static Specification<Task> filter(
+            UUID goalId,
+            UUID assigneeId,
+            UUID teamId,
+            TaskStatus status,
+            TaskPriority priority,
+            LocalDate dueDate,
+            Boolean active,
+            UUID goalOwnerId) {
         return Specification.where(withGoalId(goalId))
                 .and(withAssigneeId(assigneeId))
                 .and(withTeamId(teamId))
                 .and(withStatus(status))
                 .and(withPriority(priority))
                 .and(withDueDate(dueDate))
-                .and(withActive(active));
+                .and(withActive(active))
+                .and(withGoalOwnerId(goalOwnerId));
     }
 }

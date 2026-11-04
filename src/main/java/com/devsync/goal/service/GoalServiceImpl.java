@@ -1,5 +1,6 @@
 package com.devsync.goal.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.goal.dto.CreateGoalRequest;
@@ -19,6 +20,7 @@ import com.devsync.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,23 +35,32 @@ public class GoalServiceImpl implements GoalService {
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     public GoalServiceImpl(
             GoalRepository goalRepository,
             UserRepository userRepository,
             TeamRepository teamRepository,
-            TeamMemberRepository teamMemberRepository) {
+            TeamMemberRepository teamMemberRepository,
+            CurrentUserProvider currentUserProvider) {
         this.goalRepository = goalRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Override
     @Transactional
     public GoalResponse createGoal(CreateGoalRequest request) {
-        User owner = userRepository.findById(request.getOwnerId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getOwnerId()));
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+
+        if (request.getOwnerId() != null && !request.getOwnerId().equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot create a goal for another user");
+        }
+
+        User owner = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + currentUserId));
 
         Team team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
@@ -83,7 +94,8 @@ public class GoalServiceImpl implements GoalService {
     @Override
     @Transactional(readOnly = true)
     public GoalResponse getGoalById(UUID id) {
-        Goal goal = goalRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         return GoalResponse.fromEntity(goal);
     }
@@ -91,7 +103,8 @@ public class GoalServiceImpl implements GoalService {
     @Override
     @Transactional
     public GoalResponse updateGoal(UUID id, UpdateGoalRequest request) {
-        Goal goal = goalRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
 
         if (request.getStartDate() != null && request.getTargetDate() != null && request.getStartDate().isAfter(request.getTargetDate())) {
@@ -122,7 +135,8 @@ public class GoalServiceImpl implements GoalService {
     @Override
     @Transactional
     public void deactivateGoal(UUID id) {
-        Goal goal = goalRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         goal.setActive(false);
         goalRepository.save(goal);
@@ -140,8 +154,13 @@ public class GoalServiceImpl implements GoalService {
             LocalDate targetDate,
             Pageable pageable) {
 
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        if (ownerId != null && !ownerId.equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot access goals of another user");
+        }
+
         Boolean activeFilter = active != null ? active : true;
-        Specification<Goal> spec = GoalSpecification.filter(ownerId, teamId, status, priority, activeFilter, startDate, targetDate);
+        Specification<Goal> spec = GoalSpecification.filter(currentUserId, teamId, status, priority, activeFilter, startDate, targetDate);
         return goalRepository.findAll(spec, pageable).map(GoalResponse::fromEntity);
     }
 }

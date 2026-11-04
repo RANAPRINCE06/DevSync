@@ -1,5 +1,6 @@
 package com.devsync.goal.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.goal.dto.CreateGoalRequest;
@@ -52,6 +53,9 @@ class GoalServiceTest {
     @Mock
     private TeamMemberRepository teamMemberRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
     @InjectMocks
     private GoalServiceImpl goalService;
 
@@ -68,6 +72,8 @@ class GoalServiceTest {
         ownerId = UUID.randomUUID();
         teamId = UUID.randomUUID();
         goalId = UUID.randomUUID();
+
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(ownerId);
 
         sampleUser = User.builder()
                 .id(ownerId)
@@ -219,7 +225,7 @@ class GoalServiceTest {
     @Test
     @DisplayName("getGoalById - success")
     void getGoalById_Success() {
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, ownerId)).thenReturn(Optional.of(sampleGoal));
 
         GoalResponse response = goalService.getGoalById(goalId);
 
@@ -231,7 +237,7 @@ class GoalServiceTest {
     @Test
     @DisplayName("getGoalById - not found throws ResourceNotFoundException")
     void getGoalById_NotFound_ThrowsException() {
-        when(goalRepository.findById(goalId)).thenReturn(Optional.empty());
+        when(goalRepository.findByIdAndOwnerId(goalId, ownerId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> goalService.getGoalById(goalId));
     }
@@ -247,7 +253,7 @@ class GoalServiceTest {
                 .status(GoalStatus.IN_PROGRESS) // Even if sent as IN_PROGRESS, 100% sets to COMPLETED
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, ownerId)).thenReturn(Optional.of(sampleGoal));
         when(goalRepository.save(any(Goal.class))).thenReturn(sampleGoal);
 
         GoalResponse response = goalService.updateGoal(goalId, request);
@@ -261,7 +267,7 @@ class GoalServiceTest {
     @Test
     @DisplayName("deactivateGoal - soft deletes goal by setting active=false")
     void deactivateGoal_SoftDeletes() {
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, ownerId)).thenReturn(Optional.of(sampleGoal));
         when(goalRepository.save(any(Goal.class))).thenReturn(sampleGoal);
 
         goalService.deactivateGoal(goalId);

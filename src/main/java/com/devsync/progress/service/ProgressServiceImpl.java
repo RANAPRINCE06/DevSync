@@ -1,5 +1,6 @@
 package com.devsync.progress.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.progress.dto.CreateProgressRequest;
@@ -18,6 +19,7 @@ import com.devsync.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,23 +34,32 @@ public class ProgressServiceImpl implements ProgressService {
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     public ProgressServiceImpl(
             DailyProgressRepository dailyProgressRepository,
             UserRepository userRepository,
             TeamRepository teamRepository,
-            TeamMemberRepository teamMemberRepository) {
+            TeamMemberRepository teamMemberRepository,
+            CurrentUserProvider currentUserProvider) {
         this.dailyProgressRepository = dailyProgressRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @Override
     @Transactional
     public ProgressResponse createProgress(CreateProgressRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getUserId()));
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+
+        if (request.getUserId() != null && !request.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot create progress for another user");
+        }
+
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + currentUserId));
 
         Team team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
@@ -82,7 +93,8 @@ public class ProgressServiceImpl implements ProgressService {
     @Override
     @Transactional(readOnly = true)
     public ProgressResponse getProgressById(UUID id) {
-        DailyProgress progress = dailyProgressRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        DailyProgress progress = dailyProgressRepository.findByIdAndUserId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Daily progress entry not found with id: " + id));
         return ProgressResponse.fromEntity(progress);
     }
@@ -90,7 +102,8 @@ public class ProgressServiceImpl implements ProgressService {
     @Override
     @Transactional
     public ProgressResponse updateProgress(UUID id, UpdateProgressRequest request) {
-        DailyProgress progress = dailyProgressRepository.findById(id)
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        DailyProgress progress = dailyProgressRepository.findByIdAndUserId(id, currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Daily progress entry not found with id: " + id));
 
         progress.setWhatStudied(request.getWhatStudied().trim());
@@ -116,11 +129,16 @@ public class ProgressServiceImpl implements ProgressService {
             ProgressStatus status,
             Pageable pageable) {
 
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        if (userId != null && !userId.equals(currentUserId)) {
+            throw new AccessDeniedException("Cannot view progress of another user");
+        }
+
         if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
             throw new BadRequestException("fromDate (" + fromDate + ") cannot be after toDate (" + toDate + ")");
         }
 
-        Specification<DailyProgress> spec = DailyProgressSpecification.filter(userId, teamId, date, fromDate, toDate, status);
+        Specification<DailyProgress> spec = DailyProgressSpecification.filter(currentUserId, teamId, date, fromDate, toDate, status);
         return dailyProgressRepository.findAll(spec, pageable)
                 .map(ProgressResponse::fromEntity);
     }

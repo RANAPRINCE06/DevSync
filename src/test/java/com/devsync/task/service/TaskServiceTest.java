@@ -1,5 +1,6 @@
 package com.devsync.task.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.goal.entity.Goal;
@@ -55,6 +56,9 @@ class TaskServiceTest {
     @Mock
     private TeamMemberRepository teamMemberRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
     @InjectMocks
     private TaskServiceImpl taskService;
 
@@ -74,6 +78,8 @@ class TaskServiceTest {
         assigneeId = UUID.randomUUID();
         teamId = UUID.randomUUID();
         taskId = UUID.randomUUID();
+
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(assigneeId);
 
         sampleAssignee = User.builder()
                 .id(assigneeId)
@@ -142,7 +148,7 @@ class TaskServiceTest {
                 .estimatedMinutes(120)
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.of(sampleGoal));
         when(userRepository.findById(assigneeId)).thenReturn(Optional.of(sampleAssignee));
         when(teamMemberRepository.findByUserIdAndTeamId(assigneeId, teamId)).thenReturn(Optional.of(sampleMember));
         when(taskRepository.save(any(Task.class))).thenReturn(sampleTask);
@@ -169,7 +175,7 @@ class TaskServiceTest {
                 .priority(TaskPriority.LOW)
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.empty());
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> taskService.createTask(request));
         verify(taskRepository, never()).save(any(Task.class));
@@ -186,7 +192,7 @@ class TaskServiceTest {
                 .priority(TaskPriority.LOW)
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.of(sampleGoal));
 
         assertThrows(BadRequestException.class, () -> taskService.createTask(request));
         verify(taskRepository, never()).save(any(Task.class));
@@ -202,7 +208,7 @@ class TaskServiceTest {
                 .priority(TaskPriority.LOW)
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.of(sampleGoal));
         when(userRepository.findById(assigneeId)).thenReturn(Optional.of(sampleAssignee));
         when(teamMemberRepository.findByUserIdAndTeamId(assigneeId, teamId)).thenReturn(Optional.empty());
 
@@ -221,7 +227,7 @@ class TaskServiceTest {
                 .dueDate(LocalDate.of(2026, 8, 15)) // Goal start is 2026-09-01
                 .build();
 
-        when(goalRepository.findById(goalId)).thenReturn(Optional.of(sampleGoal));
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.of(sampleGoal));
         when(userRepository.findById(assigneeId)).thenReturn(Optional.of(sampleAssignee));
         when(teamMemberRepository.findByUserIdAndTeamId(assigneeId, teamId)).thenReturn(Optional.of(sampleMember));
 
@@ -239,7 +245,7 @@ class TaskServiceTest {
                 .actualMinutes(90)
                 .build();
 
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(sampleTask));
+        when(taskRepository.findByIdAndGoalOwnerId(taskId, assigneeId)).thenReturn(Optional.of(sampleTask));
         when(taskRepository.save(any(Task.class))).thenReturn(sampleTask);
 
         TaskResponse response = taskService.updateTask(taskId, request);
@@ -263,7 +269,7 @@ class TaskServiceTest {
                 .actualMinutes(90)
                 .build();
 
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(sampleTask));
+        when(taskRepository.findByIdAndGoalOwnerId(taskId, assigneeId)).thenReturn(Optional.of(sampleTask));
         when(taskRepository.save(any(Task.class))).thenReturn(sampleTask);
 
         TaskResponse response = taskService.updateTask(taskId, request);
@@ -277,7 +283,7 @@ class TaskServiceTest {
     @Test
     @DisplayName("deactivateTask - soft deletes task by setting active=false")
     void deactivateTask_SoftDeletes() {
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(sampleTask));
+        when(taskRepository.findByIdAndGoalOwnerId(taskId, assigneeId)).thenReturn(Optional.of(sampleTask));
         when(taskRepository.save(any(Task.class))).thenReturn(sampleTask);
 
         taskService.deactivateTask(taskId);
@@ -293,6 +299,7 @@ class TaskServiceTest {
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Task> page = new PageImpl<>(List.of(sampleTask));
 
+        when(goalRepository.findByIdAndOwnerId(goalId, assigneeId)).thenReturn(Optional.of(sampleGoal));
         when(taskRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
         Page<TaskResponse> result = taskService.getTasks(goalId, assigneeId, teamId, null, null, null, null, pageable);

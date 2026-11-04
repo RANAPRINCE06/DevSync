@@ -1,5 +1,6 @@
 package com.devsync.progress.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.progress.dto.CreateProgressRequest;
@@ -50,6 +51,9 @@ class ProgressServiceTest {
     @Mock
     private TeamMemberRepository teamMemberRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
     @InjectMocks
     private ProgressServiceImpl progressService;
 
@@ -68,6 +72,8 @@ class ProgressServiceTest {
         teamId = UUID.randomUUID();
         progressId = UUID.randomUUID();
         today = LocalDate.now();
+
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(userId);
 
         sampleUser = User.builder()
                 .id(userId)
@@ -223,7 +229,7 @@ class ProgressServiceTest {
     @Test
     @DisplayName("getProgressById - success")
     void getProgressById_Success() {
-        when(dailyProgressRepository.findById(progressId)).thenReturn(Optional.of(sampleProgress));
+        when(dailyProgressRepository.findByIdAndUserId(progressId, userId)).thenReturn(Optional.of(sampleProgress));
 
         ProgressResponse response = progressService.getProgressById(progressId);
 
@@ -235,7 +241,7 @@ class ProgressServiceTest {
     @Test
     @DisplayName("getProgressById - not found throws ResourceNotFoundException")
     void getProgressById_NotFound_ThrowsException() {
-        when(dailyProgressRepository.findById(progressId)).thenReturn(Optional.empty());
+        when(dailyProgressRepository.findByIdAndUserId(progressId, userId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> progressService.getProgressById(progressId));
     }
@@ -250,7 +256,7 @@ class ProgressServiceTest {
                 .status(ProgressStatus.COMPLETED)
                 .build();
 
-        when(dailyProgressRepository.findById(progressId)).thenReturn(Optional.of(sampleProgress));
+        when(dailyProgressRepository.findByIdAndUserId(progressId, userId)).thenReturn(Optional.of(sampleProgress));
         when(dailyProgressRepository.save(any(DailyProgress.class))).thenReturn(sampleProgress);
 
         ProgressResponse response = progressService.updateProgress(progressId, request);
