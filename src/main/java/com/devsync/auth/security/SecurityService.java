@@ -1,5 +1,7 @@
 package com.devsync.auth.security;
 
+import com.devsync.team.service.TeamAuthorizationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -8,8 +10,8 @@ import java.util.UUID;
  * Centralised ownership and access-control helper for method-level security expressions.
  *
  * <p>Annotate service or controller methods with
- * {@code @PreAuthorize("@securityService.isCurrentUser(#userId)")} to enforce that
- * the caller owns the resource identified by {@code userId}.
+ * {@code @PreAuthorize("@securityService.isCurrentUser(#userId)")} or
+ * {@code @PreAuthorize("@securityService.isTeamMember(#teamId)")} to enforce access control.
  *
  * <p>Spring resolves the {@code @securityService} SpEL bean reference using the default
  * bean name derived from {@link Service} — {@code securityService}.
@@ -18,25 +20,28 @@ import java.util.UUID;
  *
  * <p>Security invariants:
  * <ul>
- *   <li>Ownership decisions are always based on the verified JWT principal —
+ *   <li>Ownership and membership decisions are always based on the verified JWT principal —
  *       never on a user ID supplied by the HTTP client.</li>
- *   <li>{@link #isCurrentUser(UUID)} returns {@code false} (not an exception) when the
- *       caller is unauthenticated so that {@code @PreAuthorize} can cleanly deny access
- *       without propagating a checked exception through the SpEL evaluator.</li>
+ *   <li>Methods return {@code false} (not an exception) when the caller is unauthenticated so
+ *       that {@code @PreAuthorize} can cleanly deny access without propagating a checked
+ *       exception through the SpEL evaluator.</li>
  *   <li>All identity retrieval delegates to {@link CurrentUserProvider}, keeping
  *       principal-extraction logic in one place.</li>
  * </ul>
- *
- * <p>Phase A3 note: Per-module ownership enforcement (tasks, goals, teams) will be
- * added in Phase A3.2+ using {@code @PreAuthorize} expressions backed by this service.
  */
 @Service
 public class SecurityService {
 
     private final CurrentUserProvider currentUserProvider;
+    private TeamAuthorizationService teamAuthorizationService;
 
     public SecurityService(CurrentUserProvider currentUserProvider) {
         this.currentUserProvider = currentUserProvider;
+    }
+
+    @Autowired
+    public void setTeamAuthorizationService(TeamAuthorizationService teamAuthorizationService) {
+        this.teamAuthorizationService = teamAuthorizationService;
     }
 
     /**
@@ -54,6 +59,45 @@ public class SecurityService {
         }
         UUID callerId = currentUserProvider.getCurrentUserId();
         return callerId != null && callerId.equals(userId);
+    }
+
+    /**
+     * Returns {@code true} if the authenticated caller is an active member of {@code teamId}.
+     *
+     * @param teamId the team UUID
+     * @return {@code true} if the caller is an active member, {@code false} otherwise
+     */
+    public boolean isTeamMember(UUID teamId) {
+        if (teamAuthorizationService == null) {
+            return false;
+        }
+        return teamAuthorizationService.isTeamMember(teamId);
+    }
+
+    /**
+     * Returns {@code true} if the authenticated caller is the OWNER of {@code teamId}.
+     *
+     * @param teamId the team UUID
+     * @return {@code true} if the caller is the team owner, {@code false} otherwise
+     */
+    public boolean isTeamOwner(UUID teamId) {
+        if (teamAuthorizationService == null) {
+            return false;
+        }
+        return teamAuthorizationService.isTeamOwner(teamId);
+    }
+
+    /**
+     * Returns {@code true} if the authenticated caller can manage {@code teamId} (OWNER or ADMIN).
+     *
+     * @param teamId the team UUID
+     * @return {@code true} if the caller has management role, {@code false} otherwise
+     */
+    public boolean canManageTeam(UUID teamId) {
+        if (teamAuthorizationService == null) {
+            return false;
+        }
+        return teamAuthorizationService.canManageTeam(teamId);
     }
 
     /**
@@ -79,4 +123,3 @@ public class SecurityService {
         return currentUserProvider.isAuthenticated();
     }
 }
-

@@ -179,6 +179,12 @@ public class TaskServiceImpl implements TaskService {
                     .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
         }
 
+        if (teamId != null) {
+            teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
+                    .filter(TeamMember::isActive)
+                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + teamId));
+        }
+
         Boolean activeFilter = active != null ? active : true;
         Specification<Task> spec = TaskSpecification.filter(goalId, assigneeId, teamId, status, priority, dueDate, activeFilter, currentUserId);
         return taskRepository.findAll(spec, pageable).map(TaskResponse::fromEntity);

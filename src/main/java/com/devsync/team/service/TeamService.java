@@ -16,7 +16,13 @@ public interface TeamService {
 
     TeamResponse updateTeam(UUID id, UpdateTeamRequest request);
 
+    void deleteTeam(UUID id);
+
     TeamMemberResponse addMember(UUID teamId, UUID userId);
+
+    void removeMember(UUID teamId, UUID userId);
+
+    TeamMemberResponse updateMemberRole(UUID teamId, UUID userId, UpdateTeamMemberRoleRequest request);
 
     Page<TeamMemberResponse> getTeamMembers(UUID teamId, Pageable pageable);
 }

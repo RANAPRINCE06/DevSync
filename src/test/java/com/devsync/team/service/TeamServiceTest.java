@@ -1,5 +1,6 @@
 package com.devsync.team.service;
 
+import com.devsync.auth.security.CurrentUserProvider;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.team.dto.*;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -38,11 +40,18 @@ class TeamServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CurrentUserProvider currentUserProvider;
+
+    @Mock
+    private TeamAuthorizationService teamAuthorizationService;
+
     @InjectMocks
     private TeamServiceImpl teamService;
 
     private User creatorUser;
     private Team sampleTeam;
+    private TeamMember ownerMember;
     private UUID userId;
     private UUID teamId;
 
@@ -50,6 +59,8 @@ class TeamServiceTest {
     void setUp() {
         userId = UUID.randomUUID();
         teamId = UUID.randomUUID();
+
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(userId);
 
         creatorUser = User.builder()
                 .id(userId)
@@ -66,6 +77,15 @@ class TeamServiceTest {
                 .active(true)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
+                .build();
+
+        ownerMember = TeamMember.builder()
+                .id(UUID.randomUUID())
+                .user(creatorUser)
+                .team(sampleTeam)
+                .role(TeamRole.OWNER)
+                .joinedAt(Instant.now())
+                .active(true)
                 .build();
     }
 
@@ -91,6 +111,18 @@ class TeamServiceTest {
                 member.getUser().getId().equals(userId) &&
                 member.getRole().equals(TeamRole.OWNER)
         ));
+    }
+
+    @Test
+    @DisplayName("createTeam - spoofed creatorUserId throws AccessDeniedException")
+    void createTeam_SpoofedCreator_ThrowsAccessDeniedException() {
+        CreateTeamRequest request = CreateTeamRequest.builder()
+                .name("DevSync Squad")
+                .creatorUserId(UUID.randomUUID())
+                .build();
+
+        assertThrows(AccessDeniedException.class, () -> teamService.createTeam(request));
+        verify(teamRepository, never()).save(any(Team.class));
     }
 
     @Test
@@ -127,9 +159,9 @@ class TeamServiceTest {
                 .active(true)
                 .build();
 
-        when(teamRepository.findById(teamId)).thenReturn(Optional.of(sampleTeam));
+        when(teamAuthorizationService.requireCanManageTeam(teamId)).thenReturn(ownerMember);
         when(userRepository.findById(newUserId)).thenReturn(Optional.of(newMemberUser));
-        when(teamMemberRepository.existsByUserIdAndTeamId(newUserId, teamId)).thenReturn(false);
+        when(teamMemberRepository.findByUserIdAndTeamId(newUserId, teamId)).thenReturn(Optional.empty());
         when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(savedMember);
 
         TeamMemberResponse response = teamService.addMember(teamId, newUserId);
@@ -141,21 +173,77 @@ class TeamServiceTest {
     }
 
     @Test
-    @DisplayName("addMember - duplicate membership throws BadRequestException")
+    @DisplayName("addMember - duplicate active membership throws BadRequestException")
     void addMember_Duplicate_ThrowsException() {
-        when(teamRepository.findById(teamId)).thenReturn(Optional.of(sampleTeam));
+        when(teamAuthorizationService.requireCanManageTeam(teamId)).thenReturn(ownerMember);
         when(userRepository.findById(userId)).thenReturn(Optional.of(creatorUser));
-        when(teamMemberRepository.existsByUserIdAndTeamId(userId, teamId)).thenReturn(true);
+        when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(ownerMember));
 
         assertThrows(BadRequestException.class, () -> teamService.addMember(teamId, userId));
         verify(teamMemberRepository, never()).save(any(TeamMember.class));
     }
 
     @Test
-    @DisplayName("getTeamById - not found throws ResourceNotFoundException")
+    @DisplayName("getTeamById - success returns team for active member")
+    void getTeamById_Success() {
+        when(teamAuthorizationService.requireActiveMember(teamId)).thenReturn(ownerMember);
+
+        TeamResponse response = teamService.getTeamById(teamId);
+
+        assertNotNull(response);
+        assertEquals(sampleTeam.getId(), response.getId());
+    }
+
+    @Test
+    @DisplayName("getTeamById - not found or not member throws ResourceNotFoundException")
     void getTeamById_NotFound_ThrowsException() {
-        when(teamRepository.findById(teamId)).thenReturn(Optional.empty());
+        when(teamAuthorizationService.requireActiveMember(teamId))
+                .thenThrow(new ResourceNotFoundException("Team not found with id: " + teamId));
 
         assertThrows(ResourceNotFoundException.class, () -> teamService.getTeamById(teamId));
+    }
+
+    @Test
+    @DisplayName("deleteTeam - owner can deactivate team")
+    void deleteTeam_Success() {
+        when(teamAuthorizationService.requireTeamOwner(teamId)).thenReturn(ownerMember);
+
+        teamService.deleteTeam(teamId);
+
+        assertFalse(sampleTeam.isActive());
+        verify(teamRepository).save(sampleTeam);
+    }
+
+    @Test
+    @DisplayName("removeMember - cannot remove team owner throws BadRequestException")
+    void removeMember_CannotRemoveOwner_ThrowsException() {
+        when(teamAuthorizationService.requireCanManageTeam(teamId)).thenReturn(ownerMember);
+        when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(ownerMember));
+
+        assertThrows(BadRequestException.class, () -> teamService.removeMember(teamId, userId));
+    }
+
+    @Test
+    @DisplayName("updateMemberRole - owner updates member role successfully")
+    void updateMemberRole_Success() {
+        UUID memberUserId = UUID.randomUUID();
+        User regularUser = User.builder().id(memberUserId).name("Bob").email("bob@devsync.io").build();
+        TeamMember regularMember = TeamMember.builder()
+                .id(UUID.randomUUID())
+                .user(regularUser)
+                .team(sampleTeam)
+                .role(TeamRole.MEMBER)
+                .active(true)
+                .build();
+
+        when(teamAuthorizationService.requireTeamOwner(teamId)).thenReturn(ownerMember);
+        when(teamMemberRepository.findByUserIdAndTeamId(memberUserId, teamId)).thenReturn(Optional.of(regularMember));
+        when(teamMemberRepository.save(any(TeamMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateTeamMemberRoleRequest request = new UpdateTeamMemberRoleRequest(TeamRole.ADMIN);
+        TeamMemberResponse response = teamService.updateMemberRole(teamId, memberUserId, request);
+
+        assertNotNull(response);
+        assertEquals(TeamRole.ADMIN, response.getRole());
     }
 }

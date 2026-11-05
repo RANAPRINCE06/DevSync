@@ -1,6 +1,7 @@
 package com.devsync.auth.security;
 
 import com.devsync.common.exception.UnauthorizedException;
+import com.devsync.team.service.TeamAuthorizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,8 +20,8 @@ import static org.mockito.Mockito.when;
 /**
  * Unit tests for {@link SecurityService}.
  *
- * <p>Uses Mockito to stub {@link CurrentUserProvider} so each test exercises only the
- * ownership logic in {@code SecurityService} without touching the SecurityContextHolder.
+ * <p>Uses Mockito to stub {@link CurrentUserProvider} and {@link TeamAuthorizationService}
+ * so each test exercises only the ownership and authorization logic in {@code SecurityService}.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SecurityService")
@@ -29,11 +30,15 @@ class SecurityServiceTest {
     @Mock
     private CurrentUserProvider currentUserProvider;
 
+    @Mock
+    private TeamAuthorizationService teamAuthorizationService;
+
     private SecurityService securityService;
 
     @BeforeEach
     void setUp() {
         securityService = new SecurityService(currentUserProvider);
+        securityService.setTeamAuthorizationService(teamAuthorizationService);
     }
 
     // =========================================================================
@@ -84,6 +89,45 @@ class SecurityServiceTest {
 
             // null userId can never equal a real caller UUID
             assertThat(securityService.isCurrentUser(null)).isFalse();
+        }
+    }
+
+    // =========================================================================
+    // Team Authorization Helper Delegation
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Team Authorization Helpers")
+    class TeamAuthorizationHelpers {
+
+        @Test
+        @DisplayName("isTeamMember delegates to TeamAuthorizationService")
+        void isTeamMember_Delegates() {
+            UUID teamId = UUID.randomUUID();
+            when(teamAuthorizationService.isTeamMember(teamId)).thenReturn(true);
+
+            assertThat(securityService.isTeamMember(teamId)).isTrue();
+            verify(teamAuthorizationService).isTeamMember(teamId);
+        }
+
+        @Test
+        @DisplayName("isTeamOwner delegates to TeamAuthorizationService")
+        void isTeamOwner_Delegates() {
+            UUID teamId = UUID.randomUUID();
+            when(teamAuthorizationService.isTeamOwner(teamId)).thenReturn(true);
+
+            assertThat(securityService.isTeamOwner(teamId)).isTrue();
+            verify(teamAuthorizationService).isTeamOwner(teamId);
+        }
+
+        @Test
+        @DisplayName("canManageTeam delegates to TeamAuthorizationService")
+        void canManageTeam_Delegates() {
+            UUID teamId = UUID.randomUUID();
+            when(teamAuthorizationService.canManageTeam(teamId)).thenReturn(true);
+
+            assertThat(securityService.canManageTeam(teamId)).isTrue();
+            verify(teamAuthorizationService).canManageTeam(teamId);
         }
     }
 
@@ -146,4 +190,3 @@ class SecurityServiceTest {
         }
     }
 }
-

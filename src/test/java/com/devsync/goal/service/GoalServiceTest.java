@@ -98,6 +98,8 @@ class GoalServiceTest {
                 .active(true)
                 .build();
 
+        lenient().when(teamMemberRepository.findByUserIdAndTeamId(ownerId, teamId)).thenReturn(Optional.of(sampleMember));
+
         sampleGoal = Goal.builder()
                 .id(goalId)
                 .owner(sampleUser)

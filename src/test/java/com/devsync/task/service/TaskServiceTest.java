@@ -104,6 +104,8 @@ class TaskServiceTest {
                 .active(true)
                 .build();
 
+        lenient().when(teamMemberRepository.findByUserIdAndTeamId(assigneeId, teamId)).thenReturn(Optional.of(sampleMember));
+
         sampleGoal = Goal.builder()
                 .id(goalId)
                 .owner(sampleAssignee)

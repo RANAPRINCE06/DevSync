@@ -37,14 +37,14 @@ public class TeamController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get team by ID", description = "Retrieve a team by UUID")
+    @Operation(summary = "Get team by ID", description = "Retrieve a team by UUID (active members only)")
     public ResponseEntity<ApiResponse<TeamResponse>> getTeamById(@PathVariable UUID id) {
         TeamResponse team = teamService.getTeamById(id);
         return ResponseEntity.ok(ApiResponse.success(team));
     }
 
     @GetMapping
-    @Operation(summary = "Get paginated teams", description = "Retrieve teams list with pagination support")
+    @Operation(summary = "Get paginated teams", description = "Retrieve list of teams the authenticated user belongs to")
     public ResponseEntity<ApiResponse<Page<TeamResponse>>> getTeams(
             @ParameterObject
             @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
@@ -54,7 +54,7 @@ public class TeamController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update team details", description = "Update team name or description by UUID")
+    @Operation(summary = "Update team details", description = "Update team name or description by UUID (Owner or Admin only)")
     public ResponseEntity<ApiResponse<TeamResponse>> updateTeam(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateTeamRequest request) {
@@ -62,8 +62,15 @@ public class TeamController {
         return ResponseEntity.ok(ApiResponse.success("Team updated successfully", updatedTeam));
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete team", description = "Soft delete / deactivate a team (Owner only)")
+    public ResponseEntity<ApiResponse<Void>> deleteTeam(@PathVariable UUID id) {
+        teamService.deleteTeam(id);
+        return ResponseEntity.ok(ApiResponse.success("Team deactivated successfully", null));
+    }
+
     @PostMapping("/{teamId}/members/{userId}")
-    @Operation(summary = "Add member to team", description = "Add a user to a team with default MEMBER role")
+    @Operation(summary = "Add member to team", description = "Add a user to a team with default MEMBER role (Owner or Admin only)")
     public ResponseEntity<ApiResponse<TeamMemberResponse>> addMember(
             @PathVariable UUID teamId,
             @PathVariable UUID userId) {
@@ -72,8 +79,27 @@ public class TeamController {
                 .body(ApiResponse.success("Member added to team successfully", member));
     }
 
+    @DeleteMapping("/{teamId}/members/{userId}")
+    @Operation(summary = "Remove member from team", description = "Deactivate a member from a team (Owner or Admin only)")
+    public ResponseEntity<ApiResponse<Void>> removeMember(
+            @PathVariable UUID teamId,
+            @PathVariable UUID userId) {
+        teamService.removeMember(teamId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Member removed from team successfully", null));
+    }
+
+    @PutMapping("/{teamId}/members/{userId}/role")
+    @Operation(summary = "Update member role", description = "Update a team member's role (Owner only)")
+    public ResponseEntity<ApiResponse<TeamMemberResponse>> updateMemberRole(
+            @PathVariable UUID teamId,
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateTeamMemberRoleRequest request) {
+        TeamMemberResponse response = teamService.updateMemberRole(teamId, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Member role updated successfully", response));
+    }
+
     @GetMapping("/{teamId}/members")
-    @Operation(summary = "Get team members", description = "Retrieve paginated list of team members for a team")
+    @Operation(summary = "Get team members", description = "Retrieve paginated list of active team members for a team (Active members only)")
     public ResponseEntity<ApiResponse<Page<TeamMemberResponse>>> getTeamMembers(
             @PathVariable UUID teamId,
             @ParameterObject

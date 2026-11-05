@@ -159,6 +159,12 @@ public class GoalServiceImpl implements GoalService {
             throw new AccessDeniedException("Cannot access goals of another user");
         }
 
+        if (teamId != null) {
+            teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
+                    .filter(TeamMember::isActive)
+                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + teamId));
+        }
+
         Boolean activeFilter = active != null ? active : true;
         Specification<Goal> spec = GoalSpecification.filter(currentUserId, teamId, status, priority, activeFilter, startDate, targetDate);
         return goalRepository.findAll(spec, pageable).map(GoalResponse::fromEntity);

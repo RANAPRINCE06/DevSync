@@ -138,6 +138,12 @@ public class ProgressServiceImpl implements ProgressService {
             throw new BadRequestException("fromDate (" + fromDate + ") cannot be after toDate (" + toDate + ")");
         }
 
+        if (teamId != null) {
+            teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
+                    .filter(TeamMember::isActive)
+                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + teamId));
+        }
+
         Specification<DailyProgress> spec = DailyProgressSpecification.filter(currentUserId, teamId, date, fromDate, toDate, status);
         return dailyProgressRepository.findAll(spec, pageable)
                 .map(ProgressResponse::fromEntity);

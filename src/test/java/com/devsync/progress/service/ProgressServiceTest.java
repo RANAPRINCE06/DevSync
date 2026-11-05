@@ -98,6 +98,8 @@ class ProgressServiceTest {
                 .active(true)
                 .build();
 
+        lenient().when(teamMemberRepository.findByUserIdAndTeamId(userId, teamId)).thenReturn(Optional.of(sampleMember));
+
         sampleProgress = DailyProgress.builder()
                 .id(progressId)
                 .user(sampleUser)

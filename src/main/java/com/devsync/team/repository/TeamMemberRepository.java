@@ -17,9 +17,15 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, UUID> {
 
     Page<TeamMember> findByTeamId(UUID teamId, Pageable pageable);
 
+    Page<TeamMember> findByTeamIdAndActiveTrue(UUID teamId, Pageable pageable);
+
     Page<TeamMember> findByUserId(UUID userId, Pageable pageable);
 
+    Page<TeamMember> findByUserIdAndActiveTrue(UUID userId, Pageable pageable);
+
     boolean existsByUserIdAndTeamId(UUID userId, UUID teamId);
+
+    boolean existsByUserIdAndTeamIdAndActiveTrue(UUID userId, UUID teamId);
 
     Optional<TeamMember> findByUserIdAndTeamId(UUID userId, UUID teamId);
 }
