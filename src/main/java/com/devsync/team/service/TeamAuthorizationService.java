@@ -22,6 +22,7 @@ import java.util.UUID;
  *       {@link ResourceNotFoundException}) to eliminate information leakage.</li>
  *   <li>Authenticated members lacking necessary administrative roles receive HTTP 403 (via
  *       {@link AccessDeniedException}).</li>
+ *   <li>Deactivated teams immediately block all resource access with HTTP 404.</li>
  * </ul>
  */
 @Service
@@ -37,8 +38,8 @@ public class TeamAuthorizationService {
     }
 
     /**
-     * Checks if the currently authenticated user is an active member of the specified team.
-     * Never throws; returns false if unauthenticated or not a member.
+     * Checks if the currently authenticated user is an active member of the specified active team.
+     * Never throws; returns false if unauthenticated, not a member, or team is inactive.
      */
     public boolean isTeamMember(UUID teamId) {
         if (!currentUserProvider.isAuthenticated() || teamId == null) {
@@ -46,12 +47,13 @@ public class TeamAuthorizationService {
         }
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         return teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
-                .map(TeamMember::isActive)
-                .orElse(false);
+                .filter(TeamMember::isActive)
+                .filter(m -> m.getTeam().isActive())
+                .isPresent();
     }
 
     /**
-     * Checks if the currently authenticated user is the OWNER of the specified team.
+     * Checks if the currently authenticated user is the OWNER of the specified active team.
      * Never throws; returns false if unauthenticated or not an owner.
      */
     public boolean isTeamOwner(UUID teamId) {
@@ -61,12 +63,13 @@ public class TeamAuthorizationService {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         return teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
                 .filter(TeamMember::isActive)
+                .filter(m -> m.getTeam().isActive())
                 .map(m -> m.getRole() == TeamRole.OWNER)
                 .orElse(false);
     }
 
     /**
-     * Checks if the currently authenticated user can manage the specified team (OWNER or ADMIN).
+     * Checks if the currently authenticated user can manage the specified active team (OWNER or ADMIN).
      * Never throws; returns false if unauthenticated or insufficient role.
      */
     public boolean canManageTeam(UUID teamId) {
@@ -76,22 +79,29 @@ public class TeamAuthorizationService {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         return teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
                 .filter(TeamMember::isActive)
+                .filter(m -> m.getTeam().isActive())
                 .map(m -> m.getRole() == TeamRole.OWNER || m.getRole() == TeamRole.ADMIN)
                 .orElse(false);
     }
 
     /**
-     * Verifies that the caller is an active member of the specified team.
+     * Verifies that the caller is an active member of the specified active team.
      *
      * @param teamId the team to verify
      * @return the caller's active {@link TeamMember} record
-     * @throws ResourceNotFoundException if the caller is not an active member (HTTP 404 policy)
+     * @throws ResourceNotFoundException if the caller is not an active member or team is inactive (HTTP 404 policy)
      */
     public TeamMember requireActiveMember(UUID teamId) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        return teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
+        TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(currentUserId, teamId)
                 .filter(TeamMember::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + teamId));
+
+        if (!membership.getTeam().isActive()) {
+            throw new ResourceNotFoundException("Team not found with id: " + teamId);
+        }
+
+        return membership;
     }
 
     /**
@@ -126,4 +136,3 @@ public class TeamAuthorizationService {
         return membership;
     }
 }
-

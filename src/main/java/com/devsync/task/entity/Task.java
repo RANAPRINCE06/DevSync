@@ -58,6 +58,9 @@ public class Task {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "team_task", nullable = false)
+    private boolean teamTask = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -68,6 +71,10 @@ public class Task {
     }
 
     public Task(UUID id, Goal goal, User assignee, Team team, String title, String description, TaskStatus status, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes, Integer actualMinutes, Instant completedAt, boolean active, Instant createdAt, Instant updatedAt) {
+        this(id, goal, assignee, team, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, false, createdAt, updatedAt);
+    }
+
+    public Task(UUID id, Goal goal, User assignee, Team team, String title, String description, TaskStatus status, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes, Integer actualMinutes, Instant completedAt, boolean active, boolean teamTask, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.goal = goal;
         this.assignee = assignee;
@@ -81,6 +88,7 @@ public class Task {
         this.actualMinutes = actualMinutes != null ? actualMinutes : 0;
         this.completedAt = completedAt;
         this.active = active;
+        this.teamTask = teamTask;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -210,6 +218,14 @@ public class Task {
         this.active = active;
     }
 
+    public boolean isTeamTask() {
+        return teamTask;
+    }
+
+    public void setTeamTask(boolean teamTask) {
+        this.teamTask = teamTask;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -244,6 +260,7 @@ public class Task {
         private Integer actualMinutes = 0;
         private Instant completedAt;
         private boolean active = true;
+        private boolean teamTask = false;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -312,6 +329,11 @@ public class Task {
             return this;
         }
 
+        public TaskBuilder teamTask(boolean teamTask) {
+            this.teamTask = teamTask;
+            return this;
+        }
+
         public TaskBuilder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
@@ -323,7 +345,7 @@ public class Task {
         }
 
         public Task build() {
-            return new Task(id, goal, assignee, team, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, createdAt, updatedAt);
+            return new Task(id, goal, assignee, team, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, teamTask, createdAt, updatedAt);
         }
     }
 }

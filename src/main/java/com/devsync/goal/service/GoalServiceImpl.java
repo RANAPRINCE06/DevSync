@@ -15,6 +15,7 @@ import com.devsync.team.entity.Team;
 import com.devsync.team.entity.TeamMember;
 import com.devsync.team.repository.TeamMemberRepository;
 import com.devsync.team.repository.TeamRepository;
+import com.devsync.team.service.TeamAuthorizationService;
 import com.devsync.user.entity.User;
 import com.devsync.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ public class GoalServiceImpl implements GoalService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final TeamAuthorizationService teamAuthorizationService;
 
     public GoalServiceImpl(
             GoalRepository goalRepository,
@@ -48,15 +50,23 @@ public class GoalServiceImpl implements GoalService {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.currentUserProvider = currentUserProvider;
+        this.teamAuthorizationService = new TeamAuthorizationService(teamMemberRepository, currentUserProvider);
     }
 
     @Override
     @Transactional
     public GoalResponse createGoal(CreateGoalRequest request) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
+        boolean isTeamGoal = Boolean.TRUE.equals(request.getTeamGoal());
 
-        if (request.getOwnerId() != null && !request.getOwnerId().equals(currentUserId)) {
-            throw new AccessDeniedException("Cannot create a goal for another user");
+        if (isTeamGoal) {
+            // Team Goal: Only team OWNER or ADMIN can create team goals
+            teamAuthorizationService.requireCanManageTeam(request.getTeamId());
+        } else {
+            // Personal Goal: Owner must match authenticated caller
+            if (request.getOwnerId() != null && !request.getOwnerId().equals(currentUserId)) {
+                throw new AccessDeniedException("Cannot create a goal for another user");
+            }
         }
 
         User owner = userRepository.findById(currentUserId)
@@ -64,6 +74,10 @@ public class GoalServiceImpl implements GoalService {
 
         Team team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
+
+        if (!team.isActive()) {
+            throw new ResourceNotFoundException("Team not found with id: " + request.getTeamId());
+        }
 
         Optional<TeamMember> memberOpt = teamMemberRepository.findByUserIdAndTeamId(owner.getId(), team.getId());
         if (memberOpt.isEmpty() || !memberOpt.get().isActive()) {
@@ -85,6 +99,7 @@ public class GoalServiceImpl implements GoalService {
                 .priority(request.getPriority())
                 .progressPercentage(0)
                 .active(true)
+                .teamGoal(isTeamGoal)
                 .build();
 
         Goal saved = goalRepository.save(goal);
@@ -95,8 +110,23 @@ public class GoalServiceImpl implements GoalService {
     @Transactional(readOnly = true)
     public GoalResponse getGoalById(UUID id) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+        Optional<Goal> personalOpt = goalRepository.findByIdAndOwnerId(id, currentUserId);
+        Goal goal;
+        if (personalOpt.isPresent()) {
+            goal = personalOpt.get();
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireActiveMember(goal.getTeam().getId());
+            }
+        } else {
+            goal = goalRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireActiveMember(goal.getTeam().getId());
+            } else {
+                throw new ResourceNotFoundException("Goal not found with id: " + id);
+            }
+        }
+
         return GoalResponse.fromEntity(goal);
     }
 
@@ -104,8 +134,22 @@ public class GoalServiceImpl implements GoalService {
     @Transactional
     public GoalResponse updateGoal(UUID id, UpdateGoalRequest request) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+        Optional<Goal> personalOpt = goalRepository.findByIdAndOwnerId(id, currentUserId);
+        Goal goal;
+        if (personalOpt.isPresent()) {
+            goal = personalOpt.get();
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireCanManageTeam(goal.getTeam().getId());
+            }
+        } else {
+            goal = goalRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireCanManageTeam(goal.getTeam().getId());
+            } else {
+                throw new ResourceNotFoundException("Goal not found with id: " + id);
+            }
+        }
 
         if (request.getStartDate() != null && request.getTargetDate() != null && request.getStartDate().isAfter(request.getTargetDate())) {
             throw new BadRequestException("startDate (" + request.getStartDate() + ") cannot be after targetDate (" + request.getTargetDate() + ")");
@@ -136,8 +180,23 @@ public class GoalServiceImpl implements GoalService {
     @Transactional
     public void deactivateGoal(UUID id) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        Goal goal = goalRepository.findByIdAndOwnerId(id, currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+        Optional<Goal> personalOpt = goalRepository.findByIdAndOwnerId(id, currentUserId);
+        Goal goal;
+        if (personalOpt.isPresent()) {
+            goal = personalOpt.get();
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireCanManageTeam(goal.getTeam().getId());
+            }
+        } else {
+            goal = goalRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+            if (goal.isTeamGoal()) {
+                teamAuthorizationService.requireCanManageTeam(goal.getTeam().getId());
+            } else {
+                throw new ResourceNotFoundException("Goal not found with id: " + id);
+            }
+        }
+
         goal.setActive(false);
         goalRepository.save(goal);
     }
@@ -166,7 +225,8 @@ public class GoalServiceImpl implements GoalService {
         }
 
         Boolean activeFilter = active != null ? active : true;
-        Specification<Goal> spec = GoalSpecification.filter(currentUserId, teamId, status, priority, activeFilter, startDate, targetDate);
+        Specification<Goal> spec = GoalSpecification.filterWithVisibility(
+                currentUserId, teamId, status, priority, activeFilter, startDate, targetDate, null);
         return goalRepository.findAll(spec, pageable).map(GoalResponse::fromEntity);
     }
 }

@@ -38,10 +38,17 @@ public class CreateTaskRequest {
     @Schema(example = "180")
     private Integer estimatedMinutes;
 
+    @Schema(example = "false", description = "Whether this is a collaborative team task (inferred from parent goal)")
+    private Boolean teamTask;
+
     public CreateTaskRequest() {
     }
 
     public CreateTaskRequest(UUID goalId, UUID assigneeId, String title, String description, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes) {
+        this(goalId, assigneeId, title, description, priority, dueDate, estimatedMinutes, null);
+    }
+
+    public CreateTaskRequest(UUID goalId, UUID assigneeId, String title, String description, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes, Boolean teamTask) {
         this.goalId = goalId;
         this.assigneeId = assigneeId;
         this.title = title;
@@ -49,6 +56,7 @@ public class CreateTaskRequest {
         this.priority = priority;
         this.dueDate = dueDate;
         this.estimatedMinutes = estimatedMinutes;
+        this.teamTask = teamTask;
     }
 
     public UUID getGoalId() {
@@ -107,6 +115,14 @@ public class CreateTaskRequest {
         this.estimatedMinutes = estimatedMinutes;
     }
 
+    public Boolean getTeamTask() {
+        return teamTask;
+    }
+
+    public void setTeamTask(Boolean teamTask) {
+        this.teamTask = teamTask;
+    }
+
     public static CreateTaskRequestBuilder builder() {
         return new CreateTaskRequestBuilder();
     }
@@ -119,6 +135,7 @@ public class CreateTaskRequest {
         private TaskPriority priority = TaskPriority.MEDIUM;
         private LocalDate dueDate;
         private Integer estimatedMinutes;
+        private Boolean teamTask;
 
         public CreateTaskRequestBuilder goalId(UUID goalId) {
             this.goalId = goalId;
@@ -155,8 +172,13 @@ public class CreateTaskRequest {
             return this;
         }
 
+        public CreateTaskRequestBuilder teamTask(Boolean teamTask) {
+            this.teamTask = teamTask;
+            return this;
+        }
+
         public CreateTaskRequest build() {
-            return new CreateTaskRequest(goalId, assigneeId, title, description, priority, dueDate, estimatedMinutes);
+            return new CreateTaskRequest(goalId, assigneeId, title, description, priority, dueDate, estimatedMinutes, teamTask);
         }
     }
 }

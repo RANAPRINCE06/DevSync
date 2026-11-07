@@ -24,6 +24,7 @@ public class GoalResponse {
     private GoalPriority priority;
     private Integer progressPercentage;
     private boolean active;
+    private boolean teamGoal;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -31,6 +32,10 @@ public class GoalResponse {
     }
 
     public GoalResponse(UUID id, UUID ownerId, String ownerName, String ownerEmail, UUID teamId, String teamName, String title, String description, LocalDate startDate, LocalDate targetDate, GoalStatus status, GoalPriority priority, Integer progressPercentage, boolean active, Instant createdAt, Instant updatedAt) {
+        this(id, ownerId, ownerName, ownerEmail, teamId, teamName, title, description, startDate, targetDate, status, priority, progressPercentage, active, false, createdAt, updatedAt);
+    }
+
+    public GoalResponse(UUID id, UUID ownerId, String ownerName, String ownerEmail, UUID teamId, String teamName, String title, String description, LocalDate startDate, LocalDate targetDate, GoalStatus status, GoalPriority priority, Integer progressPercentage, boolean active, boolean teamGoal, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.ownerId = ownerId;
         this.ownerName = ownerName;
@@ -45,6 +50,7 @@ public class GoalResponse {
         this.priority = priority;
         this.progressPercentage = progressPercentage;
         this.active = active;
+        this.teamGoal = teamGoal;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -65,6 +71,7 @@ public class GoalResponse {
                 .priority(goal.getPriority())
                 .progressPercentage(goal.getProgressPercentage())
                 .active(goal.isActive())
+                .teamGoal(goal.isTeamGoal())
                 .createdAt(goal.getCreatedAt())
                 .updatedAt(goal.getUpdatedAt())
                 .build();
@@ -98,7 +105,7 @@ public class GoalResponse {
         return ownerEmail;
     }
 
-    public void setUserEmail(String ownerEmail) {
+    public void setOwnerEmail(String ownerEmail) {
         this.ownerEmail = ownerEmail;
     }
 
@@ -182,6 +189,14 @@ public class GoalResponse {
         this.active = active;
     }
 
+    public boolean isTeamGoal() {
+        return teamGoal;
+    }
+
+    public void setTeamGoal(boolean teamGoal) {
+        this.teamGoal = teamGoal;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -217,6 +232,7 @@ public class GoalResponse {
         private GoalPriority priority;
         private Integer progressPercentage;
         private boolean active;
+        private boolean teamGoal = false;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -290,6 +306,11 @@ public class GoalResponse {
             return this;
         }
 
+        public GoalResponseBuilder teamGoal(boolean teamGoal) {
+            this.teamGoal = teamGoal;
+            return this;
+        }
+
         public GoalResponseBuilder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
@@ -301,7 +322,7 @@ public class GoalResponse {
         }
 
         public GoalResponse build() {
-            return new GoalResponse(id, ownerId, ownerName, ownerEmail, teamId, teamName, title, description, startDate, targetDate, status, priority, progressPercentage, active, createdAt, updatedAt);
+            return new GoalResponse(id, ownerId, ownerName, ownerEmail, teamId, teamName, title, description, startDate, targetDate, status, priority, progressPercentage, active, teamGoal, createdAt, updatedAt);
         }
     }
 }

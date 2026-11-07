@@ -38,10 +38,17 @@ public class CreateGoalRequest {
     @Schema(example = "HIGH")
     private GoalPriority priority;
 
+    @Schema(example = "false", description = "Whether this is a collaborative team goal (requires OWNER or ADMIN role)")
+    private Boolean teamGoal = false;
+
     public CreateGoalRequest() {
     }
 
     public CreateGoalRequest(UUID ownerId, UUID teamId, String title, String description, LocalDate startDate, LocalDate targetDate, GoalPriority priority) {
+        this(ownerId, teamId, title, description, startDate, targetDate, priority, false);
+    }
+
+    public CreateGoalRequest(UUID ownerId, UUID teamId, String title, String description, LocalDate startDate, LocalDate targetDate, GoalPriority priority, Boolean teamGoal) {
         this.ownerId = ownerId;
         this.teamId = teamId;
         this.title = title;
@@ -49,6 +56,7 @@ public class CreateGoalRequest {
         this.startDate = startDate;
         this.targetDate = targetDate;
         this.priority = priority;
+        this.teamGoal = teamGoal != null ? teamGoal : false;
     }
 
     public UUID getOwnerId() {
@@ -107,6 +115,14 @@ public class CreateGoalRequest {
         this.priority = priority;
     }
 
+    public Boolean getTeamGoal() {
+        return teamGoal;
+    }
+
+    public void setTeamGoal(Boolean teamGoal) {
+        this.teamGoal = teamGoal;
+    }
+
     public static CreateGoalRequestBuilder builder() {
         return new CreateGoalRequestBuilder();
     }
@@ -119,6 +135,7 @@ public class CreateGoalRequest {
         private LocalDate startDate;
         private LocalDate targetDate;
         private GoalPriority priority = GoalPriority.MEDIUM;
+        private Boolean teamGoal = false;
 
         public CreateGoalRequestBuilder ownerId(UUID ownerId) {
             this.ownerId = ownerId;
@@ -155,8 +172,13 @@ public class CreateGoalRequest {
             return this;
         }
 
+        public CreateGoalRequestBuilder teamGoal(Boolean teamGoal) {
+            this.teamGoal = teamGoal;
+            return this;
+        }
+
         public CreateGoalRequest build() {
-            return new CreateGoalRequest(ownerId, teamId, title, description, startDate, targetDate, priority);
+            return new CreateGoalRequest(ownerId, teamId, title, description, startDate, targetDate, priority, teamGoal);
         }
     }
 }

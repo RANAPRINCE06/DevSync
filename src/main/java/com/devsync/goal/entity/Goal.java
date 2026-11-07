@@ -50,6 +50,9 @@ public class Goal {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "team_goal", nullable = false)
+    private boolean teamGoal = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -60,6 +63,10 @@ public class Goal {
     }
 
     public Goal(UUID id, User owner, Team team, String title, String description, LocalDate startDate, LocalDate targetDate, GoalStatus status, GoalPriority priority, Integer progressPercentage, boolean active, Instant createdAt, Instant updatedAt) {
+        this(id, owner, team, title, description, startDate, targetDate, status, priority, progressPercentage, active, false, createdAt, updatedAt);
+    }
+
+    public Goal(UUID id, User owner, Team team, String title, String description, LocalDate startDate, LocalDate targetDate, GoalStatus status, GoalPriority priority, Integer progressPercentage, boolean active, boolean teamGoal, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.owner = owner;
         this.team = team;
@@ -71,6 +78,7 @@ public class Goal {
         this.priority = priority != null ? priority : GoalPriority.MEDIUM;
         this.progressPercentage = progressPercentage != null ? progressPercentage : 0;
         this.active = active;
+        this.teamGoal = teamGoal;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -184,6 +192,14 @@ public class Goal {
         this.active = active;
     }
 
+    public boolean isTeamGoal() {
+        return teamGoal;
+    }
+
+    public void setTeamGoal(boolean teamGoal) {
+        this.teamGoal = teamGoal;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -216,6 +232,7 @@ public class Goal {
         private GoalPriority priority = GoalPriority.MEDIUM;
         private Integer progressPercentage = 0;
         private boolean active = true;
+        private boolean teamGoal = false;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -274,6 +291,11 @@ public class Goal {
             return this;
         }
 
+        public GoalBuilder teamGoal(boolean teamGoal) {
+            this.teamGoal = teamGoal;
+            return this;
+        }
+
         public GoalBuilder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
@@ -285,7 +307,7 @@ public class Goal {
         }
 
         public Goal build() {
-            return new Goal(id, owner, team, title, description, startDate, targetDate, status, priority, progressPercentage, active, createdAt, updatedAt);
+            return new Goal(id, owner, team, title, description, startDate, targetDate, status, priority, progressPercentage, active, teamGoal, createdAt, updatedAt);
         }
     }
 }

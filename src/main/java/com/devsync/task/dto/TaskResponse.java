@@ -27,6 +27,7 @@ public class TaskResponse {
     private Integer actualMinutes;
     private Instant completedAt;
     private boolean active;
+    private boolean teamTask;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -34,6 +35,10 @@ public class TaskResponse {
     }
 
     public TaskResponse(UUID id, UUID goalId, String goalTitle, UUID assigneeId, String assigneeName, String assigneeEmail, UUID teamId, String teamName, String title, String description, TaskStatus status, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes, Integer actualMinutes, Instant completedAt, boolean active, Instant createdAt, Instant updatedAt) {
+        this(id, goalId, goalTitle, assigneeId, assigneeName, assigneeEmail, teamId, teamName, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, false, createdAt, updatedAt);
+    }
+
+    public TaskResponse(UUID id, UUID goalId, String goalTitle, UUID assigneeId, String assigneeName, String assigneeEmail, UUID teamId, String teamName, String title, String description, TaskStatus status, TaskPriority priority, LocalDate dueDate, Integer estimatedMinutes, Integer actualMinutes, Instant completedAt, boolean active, boolean teamTask, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.goalId = goalId;
         this.goalTitle = goalTitle;
@@ -51,6 +56,7 @@ public class TaskResponse {
         this.actualMinutes = actualMinutes;
         this.completedAt = completedAt;
         this.active = active;
+        this.teamTask = teamTask;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -74,6 +80,7 @@ public class TaskResponse {
                 .actualMinutes(task.getActualMinutes())
                 .completedAt(task.getCompletedAt())
                 .active(task.isActive())
+                .teamTask(task.isTeamTask())
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())
                 .build();
@@ -215,6 +222,14 @@ public class TaskResponse {
         this.active = active;
     }
 
+    public boolean isTeamTask() {
+        return teamTask;
+    }
+
+    public void setTeamTask(boolean teamTask) {
+        this.teamTask = teamTask;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -253,6 +268,7 @@ public class TaskResponse {
         private Integer actualMinutes;
         private Instant completedAt;
         private boolean active;
+        private boolean teamTask = false;
         private Instant createdAt;
         private Instant updatedAt;
 
@@ -341,6 +357,11 @@ public class TaskResponse {
             return this;
         }
 
+        public TaskResponseBuilder teamTask(boolean teamTask) {
+            this.teamTask = teamTask;
+            return this;
+        }
+
         public TaskResponseBuilder createdAt(Instant createdAt) {
             this.createdAt = createdAt;
             return this;
@@ -352,7 +373,7 @@ public class TaskResponse {
         }
 
         public TaskResponse build() {
-            return new TaskResponse(id, goalId, goalTitle, assigneeId, assigneeName, assigneeEmail, teamId, teamName, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, createdAt, updatedAt);
+            return new TaskResponse(id, goalId, goalTitle, assigneeId, assigneeName, assigneeEmail, teamId, teamName, title, description, status, priority, dueDate, estimatedMinutes, actualMinutes, completedAt, active, teamTask, createdAt, updatedAt);
         }
     }
 }
