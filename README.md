@@ -38,21 +38,21 @@ DevSync is designed as a **Modular Monolithic Architecture**. The backend is mai
 
 ```mermaid
 flowchart TD
-    subgraph Client_Layer [Frontend Client: React 18, TypeScript, Vite]
-        UI["UI Layer: Tailwind CSS, Lucide Icons, Recharts"]
-        State["Server-State Management: TanStack React Query v5"]
-        HTTPClient["HTTP Client: Axios and Bearer Token Interceptor"]
-        CmdPal["Command Palette: Ctrl+K or Cmd+K"]
+    subgraph Client_Layer ["Frontend Client (React 18, TypeScript, Vite)"]
+        UI["UI Layer (Tailwind CSS, Lucide Icons, Recharts)"]
+        State["Server-State Management (TanStack React Query v5)"]
+        HTTPClient["HTTP Client (Axios + Bearer Token)"]
+        CmdPal["Command Palette (Ctrl+K / Cmd+K)"]
     end
 
-    subgraph Security_Pipeline [Security and Filter Pipeline]
-        CORS["CORS Handler"]
-        JWTFilter["JwtAuthenticationFilter: OncePerRequestFilter"]
-        SecCtx["SecurityContextHolder: DevSyncPrincipal"]
-        ExcHandler["GlobalExceptionHandler: ApiResponse"]
+    subgraph Security_Pipeline ["Security and Filter Pipeline"]
+        CORS["CORS Configuration Handler"]
+        JWTFilter["JwtAuthenticationFilter (OncePerRequestFilter)"]
+        SecCtx["SecurityContextHolder (DevSyncPrincipal)"]
+        ExcHandler["GlobalExceptionHandler (ApiResponse)"]
     end
 
-    subgraph Backend_Modules [Spring Boot Modular Monolith: Java 21]
+    subgraph Backend_Modules ["Spring Boot Modular Monolith (Java 21)"]
         AuthMod["Auth and User Module"]
         GoalMod["Goals Management Module"]
         TaskMod["Task Execution Module"]
@@ -64,32 +64,35 @@ flowchart TD
         NotifMod["Notifications and Reminders Module"]
     end
 
-    subgraph Security_Foundation [Centralized Security Foundation: Phase A3]
-        CUP["CurrentUserProvider: Security Context Accessor"]
-        SecServ["SecurityService: PreAuthorize Helper"]
+    subgraph Security_Foundation ["Centralized Security Foundation (Phase A3)"]
+        CUP["CurrentUserProvider (Security Context Accessor)"]
+        SecServ["SecurityService (@PreAuthorize Helper)"]
     end
 
-    subgraph Persistence_Layer [Persistence and Database Layer]
-        Repos["Ownership-Constrained JPA Repositories"]
+    subgraph Persistence_Layer ["Persistence and Database Layer"]
+        Repos["Ownership-Constrained Repositories"]
         Hibernate["Hibernate 6 ORM"]
-        Flyway["Flyway Database Migrations: V1 to V9"]
+        Flyway["Flyway Database Migrations"]
         Postgres[("PostgreSQL 17 Database")]
     end
 
     UI --> State
     State --> HTTPClient
-    HTTPClient -->|HTTPS REST and Bearer JWT| CORS
+    CmdPal --> UI
+    HTTPClient -->|HTTPS REST + Bearer JWT| CORS
     CORS --> JWTFilter
     JWTFilter --> SecCtx
-    JWTFilter --> AuthMod
-    JWTFilter --> GoalMod
-    JWTFilter --> TaskMod
-    JWTFilter --> ProgMod
-    JWTFilter --> TeamMod
-    JWTFilter --> RankMod
-    JWTFilter --> AchieveMod
-    JWTFilter --> ProfileMod
-    JWTFilter --> NotifMod
+    JWTFilter --> ExcHandler
+
+    SecCtx --> AuthMod
+    SecCtx --> GoalMod
+    SecCtx --> TaskMod
+    SecCtx --> ProgMod
+    SecCtx --> TeamMod
+    SecCtx --> RankMod
+    SecCtx --> AchieveMod
+    SecCtx --> ProfileMod
+    SecCtx --> NotifMod
 
     GoalMod --> Security_Foundation
     TaskMod --> Security_Foundation
@@ -199,34 +202,42 @@ Pages & Components    ─── Dashboard, Goals, Tasks (Kanban/List), Progress,
 flowchart TD
     User["DevSync Developer Workspace"]
 
-    subgraph Productivity [Personal Productivity and Tracking]
+    subgraph Productivity ["Personal Productivity & Tracking"]
         Goals["Goals Management"]
-        Tasks["Task and Kanban Execution"]
-        Progress["Daily Standup and Progress"]
+        Tasks["Task & Kanban Execution"]
+        Progress["Daily Standup & Progress"]
+        Goals --> Tasks
+        Tasks --> Progress
     end
 
-    subgraph Collaboration [Team Collaboration]
+    subgraph Collaboration ["Team Collaboration"]
         Teams["Team Workspaces"]
-        Roles["Squad Roles and Memberships"]
+        Roles["Squad Roles & Permissions"]
+        Teams --> Roles
     end
 
-    subgraph Gamification [Growth and Gamification]
-        Leaderboard["Productivity Leaderboards"]
+    subgraph Gamification ["Growth & Gamification"]
+        Leaderboard["Productivity Leaderboard"]
         Achievements["Milestones, Badges, XP"]
-        Profiles["Coding Profiles: LeetCode, Codeforces, GitHub"]
+        Profiles["Coding Profiles (LeetCode, GitHub)"]
+        Leaderboard --> Achievements
+        Achievements --> Profiles
     end
 
-    subgraph Utilities [Platform Utilities]
-        Auth["JWT Auth and User Profiles"]
+    subgraph Utilities ["Platform Utilities"]
+        Auth["JWT Auth & User Profiles"]
         Dashboard["Productivity Dashboard"]
-        Notifs["Notifications and Reminders"]
-        CmdPal["Command Palette: Ctrl+K"]
+        Notifs["Notifications & Reminders"]
+        CmdPal["Command Palette (Ctrl+K)"]
+        Auth --> Dashboard
+        Dashboard --> Notifs
+        Dashboard --> CmdPal
     end
 
-    User --> Productivity
-    User --> Collaboration
-    User --> Gamification
-    User --> Utilities
+    User --> Goals
+    User --> Teams
+    User --> Leaderboard
+    User --> Dashboard
 ```
 
 ### 4.1 Authentication & User Management
@@ -281,8 +292,8 @@ DevSync implements **Backend-First Defense-in-Depth** to completely eliminate **
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Alice as Alice - Authenticated User
-    actor Bob as Bob - Unauthorized User
+    actor Alice as Alice (Authenticated User)
+    actor Bob as Bob (Unauthorized Attacker)
     participant Filter as JwtAuthenticationFilter
     participant Controller as TaskController
     participant Service as TaskServiceImpl
@@ -290,27 +301,27 @@ sequenceDiagram
     participant Repo as TaskRepository
     participant DB as PostgreSQL DB
 
-    Note over Alice,Filter: Legitimate Request
-    Alice->>Filter: GET /api/v1/tasks/{aliceTaskId} (Bearer Token A)
+    Note over Alice,Filter: Legitimate User Request
+    Alice->>Filter: GET /api/v1/tasks/:id (Bearer Token A)
     Filter->>Filter: Verify signature and claims
     Filter->>Controller: SecurityContext populated with Alice UUID
-    Controller->>Service: getTaskById(aliceTaskId)
+    Controller->>Service: getTaskById(taskId)
     Service->>Provider: getCurrentUserId() returns Alice UUID
-    Service->>Repo: findByIdAndGoalOwnerId(aliceTaskId, Alice UUID)
-    Repo->>DB: SELECT * FROM tasks WHERE id = ? AND goal.owner_id = ?
+    Service->>Repo: findByIdAndGoalOwnerId(taskId, Alice UUID)
+    Repo->>DB: SELECT id, title FROM tasks WHERE id = ? AND goal.owner_id = ?
     DB-->>Repo: Task Record Found
     Repo-->>Service: Task Entity
     Service-->>Controller: TaskResponse DTO
     Controller-->>Alice: 200 OK (Task Payload)
 
     Note over Bob,Filter: Malicious IDOR or BOLA Attempt
-    Bob->>Filter: GET /api/v1/tasks/{aliceTaskId} (Bearer Token B)
+    Bob->>Filter: GET /api/v1/tasks/:id (Bearer Token B)
     Filter->>Filter: Verify signature and claims
     Filter->>Controller: SecurityContext populated with Bob UUID
-    Controller->>Service: getTaskById(aliceTaskId)
+    Controller->>Service: getTaskById(taskId)
     Service->>Provider: getCurrentUserId() returns Bob UUID
-    Service->>Repo: findByIdAndGoalOwnerId(aliceTaskId, Bob UUID)
-    Repo->>DB: SELECT * FROM tasks WHERE id = ? AND goal.owner_id = ?
+    Service->>Repo: findByIdAndGoalOwnerId(taskId, Bob UUID)
+    Repo->>DB: SELECT id, title FROM tasks WHERE id = ? AND goal.owner_id = ?
     DB-->>Repo: Empty Result (Record does not belong to Bob)
     Repo-->>Service: Optional.empty()
     Service-->>Controller: throw ResourceNotFoundException
@@ -334,31 +345,28 @@ sequenceDiagram
 
 ```mermaid
 erDiagram
-    USERS ||--o{ GOALS : "owns"
-    USERS ||--o{ DAILY_PROGRESS : "logs"
-    USERS ||--o{ TEAM_MEMBERS : "participates"
-    USERS ||--o{ CODING_PROFILES : "maintains"
-    USERS ||--o{ ACHIEVEMENTS : "earns"
-    USERS ||--o{ REMINDERS : "schedules"
-    USERS ||--o{ NOTIFICATIONS : "receives"
-
-    TEAMS ||--o{ TEAM_MEMBERS : "has"
-    TEAMS ||--o{ GOALS : "contains"
-    TEAMS ||--o{ TASKS : "scoped to"
-    TEAMS ||--o{ DAILY_PROGRESS : "records"
-
-    GOALS ||--o{ TASKS : "breaks down into"
+    USERS ||--o{ GOALS : owns
+    USERS ||--o{ DAILY_PROGRESS : logs
+    USERS ||--o{ TEAM_MEMBERS : participates
+    USERS ||--o{ CODING_PROFILES : maintains
+    USERS ||--o{ ACHIEVEMENTS : earns
+    USERS ||--o{ REMINDERS : schedules
+    USERS ||--o{ NOTIFICATIONS : receives
+    TEAMS ||--o{ TEAM_MEMBERS : has
+    TEAMS ||--o{ GOALS : contains
+    TEAMS ||--o{ TASKS : scopes
+    TEAMS ||--o{ DAILY_PROGRESS : records
+    GOALS ||--o{ TASKS : contains
 
     USERS {
         uuid id PK
         string name
-        string email UK
+        string email
         string password_hash
         string timezone
         boolean active
         timestamp created_at
     }
-
     TEAMS {
         uuid id PK
         string name
@@ -366,16 +374,14 @@ erDiagram
         boolean active
         timestamp created_at
     }
-
     TEAM_MEMBERS {
         uuid id PK
         uuid user_id FK
         uuid team_id FK
-        string role "OWNER, ADMIN, MEMBER"
+        string role
         boolean active
         timestamp joined_at
     }
-
     GOALS {
         uuid id PK
         uuid owner_id FK
@@ -384,12 +390,11 @@ erDiagram
         string description
         date start_date
         date target_date
-        string status "NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD"
-        string priority "LOW, MEDIUM, HIGH, CRITICAL"
+        string status
+        string priority
         int progress_percentage
         boolean active
     }
-
     TASKS {
         uuid id PK
         uuid goal_id FK
@@ -397,15 +402,14 @@ erDiagram
         uuid team_id FK
         string title
         string description
-        string status "TODO, IN_PROGRESS, BLOCKED, COMPLETED"
-        string priority "LOW, MEDIUM, HIGH"
+        string status
+        string priority
         date due_date
         int estimated_minutes
         int actual_minutes
         timestamp completed_at
         boolean active
     }
-
     DAILY_PROGRESS {
         uuid id PK
         uuid user_id FK
@@ -417,7 +421,7 @@ erDiagram
         string challenges
         string improvement_areas
         string tomorrow_plan
-        string status "IN_PROGRESS, COMPLETED, PARTIAL"
+        string status
     }
 ```
 
