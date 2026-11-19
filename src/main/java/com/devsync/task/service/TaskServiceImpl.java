@@ -193,13 +193,9 @@ public class TaskServiceImpl implements TaskService {
                     throw new AccessDeniedException("Regular team members cannot update tasks assigned to other members");
                 }
                 boolean titleChanged = request.getTitle() != null && !request.getTitle().trim().equals(task.getTitle());
-                boolean descChanged = request.getDescription() != null
-                        ? !request.getDescription().trim().equals(task.getDescription() != null ? task.getDescription() : "")
-                        : task.getDescription() != null;
+                boolean descChanged = request.getDescription() != null && !request.getDescription().trim().equals(task.getDescription() != null ? task.getDescription().trim() : "");
                 boolean priorityChanged = request.getPriority() != null && request.getPriority() != task.getPriority();
-                boolean dueDateChanged = request.getDueDate() != null
-                        ? !request.getDueDate().equals(task.getDueDate())
-                        : task.getDueDate() != null;
+                boolean dueDateChanged = request.getDueDate() != null && !request.getDueDate().equals(task.getDueDate());
 
                 if (titleChanged || descChanged || priorityChanged || dueDateChanged) {
                     throw new AccessDeniedException("Regular team members can only update progress (status and actual minutes) on their assigned tasks");
@@ -208,13 +204,17 @@ public class TaskServiceImpl implements TaskService {
                 if (request.getActualMinutes() != null && (request.getActualMinutes() < 0 || request.getActualMinutes() > 1440)) {
                     throw new BadRequestException("actualMinutes must be between 0 and 1440");
                 }
-                if (request.getStatus() == TaskStatus.COMPLETED && task.getStatus() != TaskStatus.COMPLETED) {
-                    task.setCompletedAt(Instant.now());
-                } else if (request.getStatus() != TaskStatus.COMPLETED && task.getStatus() == TaskStatus.COMPLETED) {
-                    task.setCompletedAt(null);
+                if (request.getStatus() != null) {
+                    if (request.getStatus() == TaskStatus.COMPLETED && task.getStatus() != TaskStatus.COMPLETED) {
+                        task.setCompletedAt(Instant.now());
+                    } else if (request.getStatus() != TaskStatus.COMPLETED && task.getStatus() == TaskStatus.COMPLETED) {
+                        task.setCompletedAt(null);
+                    }
+                    task.setStatus(request.getStatus());
                 }
-                task.setStatus(request.getStatus());
-                task.setActualMinutes(request.getActualMinutes() != null ? request.getActualMinutes() : 0);
+                if (request.getActualMinutes() != null) {
+                    task.setActualMinutes(request.getActualMinutes());
+                }
             }
         }
 

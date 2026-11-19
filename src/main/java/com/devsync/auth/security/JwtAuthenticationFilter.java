@@ -79,25 +79,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String token = resolveToken(request);
 
-            if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-                // All identity data comes from the verified token — never from the request
-                UUID userId = jwtTokenProvider.extractUserId(token);
-                String email = jwtTokenProvider.extractEmail(token);
-                List<String> roles = jwtTokenProvider.extractRoles(token);
+            if (StringUtils.hasText(token)) {
+                if (jwtTokenProvider.validateToken(token)) {
+                    // All identity data comes from the verified token — never from the request
+                    UUID userId = jwtTokenProvider.extractUserId(token);
+                    String email = jwtTokenProvider.extractEmail(token);
+                    List<String> roles = jwtTokenProvider.extractRoles(token);
 
-                List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                        .toList();
+                    List<SimpleGrantedAuthority> authorities = roles.stream()
+                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                            .toList();
 
-                // Principal is a DevSyncPrincipal carrying both UUID and email
-                DevSyncPrincipal principal = new DevSyncPrincipal(userId, email);
+                    // Principal is a DevSyncPrincipal carrying both UUID and email
+                    DevSyncPrincipal principal = new DevSyncPrincipal(userId, email);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(principal, null, authorities);
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(principal, null, authorities);
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("JWT authentication established for user: {}", userId);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.debug("JWT authentication established for user: {}", userId);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
             }
         } catch (Exception ex) {
             // Clear context; let the filter chain proceed to endpoint security which returns 401.

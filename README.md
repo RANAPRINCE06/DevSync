@@ -5,12 +5,12 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.3-brightgreen.svg?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Spring Security](https://img.shields.io/badge/Spring%20Security-6.4-blue.svg?style=flat-square&logo=springsecurity)](https://spring.io/projects/spring-security)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Flyway](https://img.shields.io/badge/Flyway-Migrations-red.svg?style=flat-square&logo=flyway)](https://flywaydb.org/)
+[![Flyway](https://img.shields.io/badge/Flyway-Migrations%20(V1--V11)-red.svg?style=flat-square&logo=flyway)](https://flywaydb.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg?style=flat-square&logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-251%20Passed-success.svg?style=flat-square)](https://github.com/RANAPRINCE06/DevSync)
+[![Tests](https://img.shields.io/badge/Tests-332%20Passed-success.svg?style=flat-square)](https://github.com/RANAPRINCE06/DevSync)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat-square)](LICENSE)
 
 ---
@@ -36,81 +36,57 @@ DevSync is designed as a **Modular Monolithic Architecture**. The backend is mai
 
 ### 2.1 High-Level Architecture
 
-```mermaid
-flowchart TD
-    subgraph Client_Layer ["Frontend Client (React 18, TypeScript, Vite)"]
-        UI["UI Layer (Tailwind CSS, Lucide Icons, Recharts)"]
-        State["Server-State Management (TanStack React Query v5)"]
-        HTTPClient["HTTP Client (Axios + Bearer Token)"]
-        CmdPal["Command Palette (Ctrl+K / Cmd+K)"]
-    end
-
-    subgraph Security_Pipeline ["Security and Filter Pipeline"]
-        CORS["CORS Configuration Handler"]
-        JWTFilter["JwtAuthenticationFilter (OncePerRequestFilter)"]
-        SecCtx["SecurityContextHolder (DevSyncPrincipal)"]
-        ExcHandler["GlobalExceptionHandler (ApiResponse)"]
-    end
-
-    subgraph Backend_Modules ["Spring Boot Modular Monolith (Java 21)"]
-        AuthMod["Auth and User Module"]
-        GoalMod["Goals Management Module"]
-        TaskMod["Task Execution Module"]
-        ProgMod["Daily Progress Module"]
-        TeamMod["Team and Workspace Module"]
-        RankMod["Leaderboard and Analytics Module"]
-        AchieveMod["Achievements and XP Module"]
-        ProfileMod["Coding Profile Module"]
-        NotifMod["Notifications and Reminders Module"]
-    end
-
-    subgraph Security_Foundation ["Centralized Security Foundation (Phase A3)"]
-        CUP["CurrentUserProvider (Security Context Accessor)"]
-        SecServ["SecurityService (@PreAuthorize Helper)"]
-    end
-
-    subgraph Persistence_Layer ["Persistence and Database Layer"]
-        Repos["Ownership-Constrained Repositories"]
-        Hibernate["Hibernate 6 ORM"]
-        Flyway["Flyway Database Migrations"]
-        Postgres[("PostgreSQL 17 Database")]
-    end
-
-    UI --> State
-    State --> HTTPClient
-    CmdPal --> UI
-    HTTPClient -->|HTTPS REST + Bearer JWT| CORS
-    CORS --> JWTFilter
-    JWTFilter --> SecCtx
-    JWTFilter --> ExcHandler
-
-    SecCtx --> AuthMod
-    SecCtx --> GoalMod
-    SecCtx --> TaskMod
-    SecCtx --> ProgMod
-    SecCtx --> TeamMod
-    SecCtx --> RankMod
-    SecCtx --> AchieveMod
-    SecCtx --> ProfileMod
-    SecCtx --> NotifMod
-
-    GoalMod --> Security_Foundation
-    TaskMod --> Security_Foundation
-    ProgMod --> Security_Foundation
-
-    AuthMod --> Repos
-    GoalMod --> Repos
-    TaskMod --> Repos
-    ProgMod --> Repos
-    TeamMod --> Repos
-    RankMod --> Repos
-    AchieveMod --> Repos
-    ProfileMod --> Repos
-    NotifMod --> Repos
-
-    Repos --> Hibernate
-    Hibernate --> Postgres
-    Flyway --> Postgres
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 Client Layer (React 18 • TypeScript • Vite)                 │
+│  ┌───────────────────────┐   ┌───────────────────┐   ┌───────────────────┐  │
+│  │ Tailwind CSS • Lucide │──▶│  TanStack Query   │──▶│ Axios Interceptor │  │
+│  │  Recharts Visuals     │   │  v5 Server State  │   │  Bearer JWT Auth  │  │
+│  └───────────────────────┘   └───────────────────┘   └─────────┬─────────┘  │
+│                                Command Palette (Ctrl+K) ───────┘            │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ HTTPS REST / JSON
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Security & Filter Pipeline                           │
+│  ┌──────────────┐     ┌────────────────────────┐     ┌───────────────────┐  │
+│  │ CORS Handler │────▶│ JwtAuthenticationFilter │────▶│  SecurityContext  │  │
+│  │ Allowed Web  │     │ (OncePerRequestFilter) │     │ (DevSyncPrincipal)│  │
+│  └──────────────┘     └────────────────────────┘     └─────────┬─────────┘  │
+└──────────────────────────────────────┬─────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Spring Boot Modular Monolith (Java 21)                   │
+│                                                                             │
+│  ┌────────────────────────┐ ┌────────────────────────┐ ┌─────────────────┐  │
+│  │ Auth & User Management │ │ Goals Planning Module  │ │ Task Execution  │  │
+│  └───────────┬────────────┘ └───────────┬────────────┘ └────────┬────────┘  │
+│  ┌───────────┴────────────┐ ┌───────────┴────────────┐ ┌────────┴────────┐  │
+│  │ Daily Progress Tracker │ │ Team Workspaces & RBAC │ │ Gamified XP &   │  │
+│  │ (Owner Scoped Log)     │ │ (Owner, Admin, Member) │ │ Leaderboards    │  │
+│  └───────────┬────────────┘ └───────────┬────────────┘ └────────┬────────┘  │
+│  ┌───────────┴────────────┐ ┌───────────┴────────────┐ ┌────────┴────────┐  │
+│  │ Coding Profiles Track  │ │ Notifications & Alerts │ │ Command Palette │  │
+│  │ (LeetCode, GitHub etc) │ │ In-App & Reminders     │ │ Actions Service │  │
+│  └────────────────────────┘ └────────────────────────┘ └─────────────────┘  │
+│                                       │                                     │
+│                     Centralized Security Foundation                         │
+│         [ CurrentUserProvider ]  ───  [ TeamAuthorizationService ]          │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Persistence & Database Layer                         │
+│                                                                             │
+│  ┌────────────────────────────────────┐    ┌─────────────────────────────┐  │
+│  │  Ownership-Constrained Repositories │───▶│       Hibernate 6 ORM       │  │
+│  │  (findByIdAndOwnerId, Spec API)    │    │ Entity Mapping & Lifecycle  │  │
+│  └────────────────────────────────────┘    └──────────────┬──────────────┘  │
+│                                                           ▼                 │
+│  ┌────────────────────────────────────┐    ┌─────────────────────────────┐  │
+│  │  Flyway Schema Migrations (V1-V11) │───▶│ PostgreSQL 17 Database      │  │
+│  │  Version-controlled DDL & Indices  │    │ Tables, FKs, Unique Checks  │  │
+│  └────────────────────────────────────┘    └─────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 Layered Backend Architecture
@@ -198,46 +174,21 @@ Pages & Components    ─── Dashboard, Goals, Tasks (Kanban/List), Progress,
 
 ## 4. Core Application Modules
 
-```mermaid
-flowchart TD
-    User["DevSync Developer Workspace"]
-
-    subgraph Productivity ["Personal Productivity & Tracking"]
-        Goals["Goals Management"]
-        Tasks["Task & Kanban Execution"]
-        Progress["Daily Standup & Progress"]
-        Goals --> Tasks
-        Tasks --> Progress
-    end
-
-    subgraph Collaboration ["Team Collaboration"]
-        Teams["Team Workspaces"]
-        Roles["Squad Roles & Permissions"]
-        Teams --> Roles
-    end
-
-    subgraph Gamification ["Growth & Gamification"]
-        Leaderboard["Productivity Leaderboard"]
-        Achievements["Milestones, Badges, XP"]
-        Profiles["Coding Profiles (LeetCode, GitHub)"]
-        Leaderboard --> Achievements
-        Achievements --> Profiles
-    end
-
-    subgraph Utilities ["Platform Utilities"]
-        Auth["JWT Auth & User Profiles"]
-        Dashboard["Productivity Dashboard"]
-        Notifs["Notifications & Reminders"]
-        CmdPal["Command Palette (Ctrl+K)"]
-        Auth --> Dashboard
-        Dashboard --> Notifs
-        Dashboard --> CmdPal
-    end
-
-    User --> Goals
-    User --> Teams
-    User --> Leaderboard
-    User --> Dashboard
+```text
+                              ┌─────────────────────────────┐
+                              │ DevSync Developer Workspace │
+                              └──────────────┬──────────────┘
+                                             │
+      ┌──────────────────────┬───────────────┴───────────────┬──────────────────────┐
+      ▼                      ▼                               ▼                      ▼
+┌──────────────────┐   ┌──────────────────┐            ┌──────────────────┐   ┌──────────────────┐
+│   Productivity   │   │  Collaboration   │            │   Gamification   │   │    Utilities     │
+├──────────────────┤   ├──────────────────┤            ├──────────────────┤   ├──────────────────┤
+│ • Goals Planning │   │ • Team Workspace │            │ • Leaderboards   │   │ • JWT Auth & User│
+│ • Task Kanban    │   │ • Squad Roles    │            │ • Milestones & XP│   │ • Dashboard Hub  │
+│ • Daily Standup  │   │ • Shared Goals   │            │ • Coding Profiles│   │ • Notifications  │
+│ • Study Minutes  │   │ • Assigned Tasks │            │   (LeetCode, Git)│   │ • Command Palette│
+└──────────────────┘   └──────────────────┘            └──────────────────┘   └──────────────────┘
 ```
 
 ### 4.1 Authentication & User Management
@@ -302,7 +253,7 @@ sequenceDiagram
     participant DB as PostgreSQL DB
 
     Note over Alice,Filter: Legitimate User Request
-    Alice->>Filter: GET /api/v1/tasks/:id (Bearer Token A)
+    Alice->>Filter: GET /api/v1/tasks/{id} (Token A)
     Filter->>Filter: Verify signature and claims
     Filter->>Controller: SecurityContext populated with Alice UUID
     Controller->>Service: getTaskById(taskId)
@@ -315,7 +266,7 @@ sequenceDiagram
     Controller-->>Alice: 200 OK (Task Payload)
 
     Note over Bob,Filter: Malicious IDOR or BOLA Attempt
-    Bob->>Filter: GET /api/v1/tasks/:id (Bearer Token B)
+    Bob->>Filter: GET /api/v1/tasks/{id} (Token B)
     Filter->>Filter: Verify signature and claims
     Filter->>Controller: SecurityContext populated with Bob UUID
     Controller->>Service: getTaskById(taskId)
@@ -357,73 +308,22 @@ erDiagram
     TEAMS ||--o{ TASKS : scopes
     TEAMS ||--o{ DAILY_PROGRESS : records
     GOALS ||--o{ TASKS : contains
-
-    USERS {
-        uuid id PK
-        string name
-        string email
-        string password_hash
-        string timezone
-        boolean active
-        timestamp created_at
-    }
-    TEAMS {
-        uuid id PK
-        string name
-        string description
-        boolean active
-        timestamp created_at
-    }
-    TEAM_MEMBERS {
-        uuid id PK
-        uuid user_id FK
-        uuid team_id FK
-        string role
-        boolean active
-        timestamp joined_at
-    }
-    GOALS {
-        uuid id PK
-        uuid owner_id FK
-        uuid team_id FK
-        string title
-        string description
-        date start_date
-        date target_date
-        string status
-        string priority
-        int progress_percentage
-        boolean active
-    }
-    TASKS {
-        uuid id PK
-        uuid goal_id FK
-        uuid assignee_id FK
-        uuid team_id FK
-        string title
-        string description
-        string status
-        string priority
-        date due_date
-        int estimated_minutes
-        int actual_minutes
-        timestamp completed_at
-        boolean active
-    }
-    DAILY_PROGRESS {
-        uuid id PK
-        uuid user_id FK
-        uuid team_id FK
-        date progress_date
-        string what_studied
-        string completed
-        int study_minutes
-        string challenges
-        string improvement_areas
-        string tomorrow_plan
-        string status
-    }
 ```
+
+### 6.1 Core Relational Schema
+
+| Entity | Primary Key | Key Foreign Keys | Key Attributes & Constraints |
+|---|---|---|---|
+| **`users`** | `id` (UUID) | — | `email` (Unique), `password_hash`, `timezone`, `active` |
+| **`teams`** | `id` (UUID) | — | `name`, `description`, `active` |
+| **`team_members`** | `id` (UUID) | `user_id`, `team_id` | `role` (`OWNER`, `ADMIN`, `MEMBER`), `active` |
+| **`goals`** | `id` (UUID) | `owner_id`, `team_id` | `title`, `status`, `priority`, `progress_percentage` |
+| **`tasks`** | `id` (UUID) | `goal_id`, `assignee_id`, `team_id` | `title`, `status`, `priority`, `due_date`, `actual_minutes` |
+| **`daily_progress`** | `id` (UUID) | `user_id`, `team_id` | `progress_date`, `what_studied`, `study_minutes`, `status` |
+| **`coding_profiles`** | `id` (UUID) | `user_id` | `platform` (LeetCode, GitHub, etc.), `username` |
+| **`achievements`** | `id` (UUID) | `user_id` | `badge_name`, `xp_awarded`, `earned_at` |
+| **`reminders`** | `id` (UUID) | `user_id` | `title`, `remind_at`, `is_sent` |
+| **`notifications`** | `id` (UUID) | `user_id` | `title`, `message`, `is_read` |
 
 ---
 
@@ -439,16 +339,18 @@ erDiagram
 | **Phase A1: Spring Security** | SecurityConfig, PBKDF2 PasswordEncoder, Error Handlers | ✅ Complete | Stateless session, CORS, CSRF disabled |
 | **Phase A2: JWT Auth** | JJWT 0.12.6, JwtTokenProvider, JwtAuthenticationFilter | ✅ Complete | 202 backend tests passing |
 | **Phase A3.1: User Context** | CurrentUserProvider, SecurityService, @EnableMethodSecurity | ✅ Complete | 228 backend tests passing |
-| **Phase A3.2: Ownership Security** | IDOR protection on Tasks, Goals, Daily Progress | ✅ Complete | **251 backend tests passing (0 failures)** |
-| **Phase A3.3: Team Authorization** | Team Lead permissions, workspace boundaries, squad RBAC | ⏳ Upcoming | Ready for implementation |
+| **Phase A3.2: Ownership Security** | IDOR protection on Tasks, Goals, Daily Progress | ✅ Complete | 251 backend tests passing |
+| **Phase A3.3: Team Authorization** | Squad roles (OWNER, ADMIN, MEMBER), workspace isolation | ✅ Complete | 295 backend tests passing |
+| **Phase A3.4: Collaborative Resources** | Team Goals & Tasks, assignee progress, metadata protection | ✅ Complete | 325 backend tests passing |
+| **Phase A3.5: Security Regression Audit** | Comprehensive JWT, IDOR, RBAC, partial update hardening | ✅ Complete | **332 backend tests passing (0 failures)** |
 
-### 7.2 Backend Test Suite Breakdown (251 Tests)
+### 7.2 Backend Test Suite Breakdown (332 Tests)
 
 ```
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
-[INFO] Tests run: 251, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 332, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

@@ -428,5 +428,47 @@ class CollaborativeTeamTaskSecurityTest {
                 )))
                 .andExpect(jsonPath("$.data.content[*].title", not(hasItem("Alice Personal Task"))));
     }
+
+    @Test
+    @DisplayName("Assigned member partial update omitting description/dueDate preserves existing metadata and updates progress")
+    void assignedMember_PartialUpdate_PreservesMetadataAndUpdatesProgress() throws Exception {
+        UpdateTaskRequest request = UpdateTaskRequest.builder()
+                .title("Build Auth Token Filter")
+                .priority(TaskPriority.HIGH)
+                .status(TaskStatus.COMPLETED)
+                .actualMinutes(75)
+                // description and dueDate omitted (null)
+                .build();
+
+        mockMvc.perform(put("/api/v1/tasks/" + daveTeamTask.getId())
+                        .header("Authorization", "Bearer " + tokenDave)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.actualMinutes").value(75))
+                .andExpect(jsonPath("$.data.description").value("Assigned to Dave"))
+                .andExpect(jsonPath("$.data.dueDate").value(daveTeamTask.getDueDate().toString()));
+    }
+
+    @Test
+    @DisplayName("Assigned member modifying dueDate is rejected with 403 Forbidden")
+    void assignedMember_ModifyingDueDate_Returns403() throws Exception {
+        UpdateTaskRequest request = UpdateTaskRequest.builder()
+                .title("Build Auth Token Filter")
+                .description("Assigned to Dave")
+                .priority(TaskPriority.HIGH)
+                .dueDate(daveTeamTask.getDueDate().plusDays(5)) // Modified due date
+                .status(TaskStatus.IN_PROGRESS)
+                .actualMinutes(30)
+                .build();
+
+        mockMvc.perform(put("/api/v1/tasks/" + daveTeamTask.getId())
+                        .header("Authorization", "Bearer " + tokenDave)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
 }
 

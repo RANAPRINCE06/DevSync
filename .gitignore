@@ -17,3 +17,8 @@ target/
 
 # Local & Internal
 .jetro/
+.github/
+.mcp.json
+.windsurfrules
+AGENT.md
+CLAUDE.md

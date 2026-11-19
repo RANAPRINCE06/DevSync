@@ -192,9 +192,8 @@ class JwtSecurityTest {
         @DisplayName("Tampered payload (modified signature) is rejected")
         void validateToken_TamperedSignature_ReturnsFalse() {
             String token = jwtTokenProvider.generateToken(testUserId, testEmail, List.of("USER"));
-            // Flip the last character of the signature segment
-            String tampered = token.substring(0, token.length() - 1) +
-                    (token.charAt(token.length() - 1) == 'A' ? 'B' : 'A');
+            // Replace signature segment characters to guarantee signature invalidation
+            String tampered = token.substring(0, token.length() - 5) + "XXXXX";
             assertFalse(jwtTokenProvider.validateToken(tampered));
         }
 
@@ -248,6 +247,59 @@ class JwtSecurityTest {
             String unsignedToken = header + "." + payload + ".";
 
             assertFalse(jwtTokenProvider.validateToken(unsignedToken));
+        }
+
+        @Test
+        @DisplayName("Token missing userId claim is rejected")
+        void validateToken_MissingUserIdClaim_ReturnsFalse() {
+            byte[] keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
+            SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+
+            String tokenWithoutUserId = Jwts.builder()
+                    .subject(testEmail)
+                    .claim("roles", List.of("USER"))
+                    .issuedAt(new Date())
+                    .expiration(new Date(System.currentTimeMillis() + 3_600_000L))
+                    .signWith(key, Jwts.SIG.HS256)
+                    .compact();
+
+            assertFalse(jwtTokenProvider.validateToken(tokenWithoutUserId));
+        }
+
+        @Test
+        @DisplayName("Token with invalid non-UUID userId claim is rejected")
+        void validateToken_InvalidUserIdFormat_ReturnsFalse() {
+            byte[] keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
+            SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+
+            String tokenWithMalformedUserId = Jwts.builder()
+                    .subject(testEmail)
+                    .claim("userId", "not-a-valid-uuid")
+                    .claim("roles", List.of("USER"))
+                    .issuedAt(new Date())
+                    .expiration(new Date(System.currentTimeMillis() + 3_600_000L))
+                    .signWith(key, Jwts.SIG.HS256)
+                    .compact();
+
+            assertFalse(jwtTokenProvider.validateToken(tokenWithMalformedUserId));
+        }
+
+        @Test
+        @DisplayName("Token with blank subject claim is rejected")
+        void validateToken_BlankSubjectClaim_ReturnsFalse() {
+            byte[] keyBytes = Base64.getDecoder().decode(jwtProperties.getSecret());
+            SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+
+            String tokenWithoutSubject = Jwts.builder()
+                    .subject("")
+                    .claim("userId", testUserId.toString())
+                    .claim("roles", List.of("USER"))
+                    .issuedAt(new Date())
+                    .expiration(new Date(System.currentTimeMillis() + 3_600_000L))
+                    .signWith(key, Jwts.SIG.HS256)
+                    .compact();
+
+            assertFalse(jwtTokenProvider.validateToken(tokenWithoutSubject));
         }
     }
 
@@ -340,8 +392,7 @@ class JwtSecurityTest {
         @DisplayName("Protected API endpoint returns HTTP 401 with tampered token")
         void protectedEndpoint_TamperedToken_Returns401() throws Exception {
             String token = jwtTokenProvider.generateToken(testUserId, testEmail, List.of("USER"));
-            String tampered = token.substring(0, token.length() - 1) +
-                    (token.charAt(token.length() - 1) == 'A' ? 'B' : 'A');
+            String tampered = token.substring(0, token.length() - 5) + "XXXXX";
 
             mockMvc.perform(get("/api/v1/users")
                             .header("Authorization", "Bearer " + tampered))

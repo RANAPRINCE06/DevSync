@@ -107,7 +107,18 @@ public class JwtTokenProvider {
      */
     public boolean validateToken(String token) {
         try {
-            parseClaims(token);
+            Claims claims = parseClaims(token);
+            String userIdStr = claims.get(CLAIM_USER_ID, String.class);
+            if (userIdStr == null || userIdStr.isBlank() || claims.getSubject() == null || claims.getSubject().isBlank()) {
+                log.warn("JWT validation failed: missing required claims (userId or subject)");
+                return false;
+            }
+            try {
+                UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                log.warn("JWT validation failed: invalid userId claim format");
+                return false;
+            }
             return true;
         } catch (ExpiredJwtException e) {
             log.warn("JWT validation failed: token is expired");
