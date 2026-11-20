@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg?style=flat-square&logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38B2AC.svg?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-332%20Passed-success.svg?style=flat-square)](https://github.com/RANAPRINCE06/DevSync)
+[![Tests](https://img.shields.io/badge/Tests-348%20Passed-success.svg?style=flat-square)](https://github.com/RANAPRINCE06/DevSync)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat-square)](LICENSE)
 
 ---
@@ -437,22 +437,42 @@ sequenceDiagram
 
 ---
 
-## 6. Database Entity Relationships
+## 6. Database Entity Relationships & Relational Data Architecture
+
+Entity relationships and foreign key cascades across personal, collaborative team, and platform integration schemas:
 
 ```mermaid
-erDiagram
-    USERS ||--o{ GOALS : owns
-    USERS ||--o{ DAILY_PROGRESS : logs
-    USERS ||--o{ TEAM_MEMBERS : participates
-    USERS ||--o{ CODING_PROFILES : maintains
-    USERS ||--o{ ACHIEVEMENTS : earns
-    USERS ||--o{ REMINDERS : schedules
-    USERS ||--o{ NOTIFICATIONS : receives
-    TEAMS ||--o{ TEAM_MEMBERS : has
-    TEAMS ||--o{ GOALS : contains
-    TEAMS ||--o{ TASKS : scopes
-    TEAMS ||--o{ DAILY_PROGRESS : records
-    GOALS ||--o{ TASKS : contains
+sequenceDiagram
+    autonumber
+    participant Users as users (UUID PK)
+    participant Teams as teams (UUID PK)
+    participant Members as team_members (user_id, team_id)
+    participant Goals as goals (owner_id, team_id)
+    participant Tasks as tasks (goal_id, team_id, assignee_id)
+    participant Progress as daily_progress (user_id, team_id)
+    participant Profiles as coding_profiles / accounts (user_id)
+    participant Badges as achievements & reminders (user_id)
+
+    Note over Users,Teams: 1. Core Identity & Multi-Tenant Scoping
+    Users->>Members: FK user_id (1:N user team participation)
+    Teams->>Members: FK team_id (1:N team roster composition)
+
+    Note over Users,Goals: 2. Ownership & Goal Planning Schema
+    Users->>Goals: FK owner_id (1:N user goal ownership)
+    Teams-->>Goals: FK team_id nullable (1:N collaborative team scoping)
+
+    Note over Goals,Tasks: 3. Hierarchical Task Execution Schema
+    Goals->>Tasks: FK goal_id (1:N goal task decomposition)
+    Teams-->>Tasks: FK team_id nullable (1:N squad task scoping)
+    Users-->>Tasks: FK assignee_id nullable (1:N delegated task assignment)
+
+    Note over Users,Progress: 4. Daily Accountability & Growth Schema
+    Users->>Progress: FK user_id (1:N daily standup progress logs)
+    Teams-->>Progress: FK team_id nullable (1:N team-scoped daily accountability)
+
+    Note over Users,Badges: 5. Profiles, Gamification & Notification Schema
+    Users->>Profiles: FK user_id (1:N competitive coding platform accounts)
+    Users->>Badges: FK user_id (1:N earned achievements, notifications & reminders)
 ```
 
 ### 6.1 Core Relational Schema
@@ -487,15 +507,16 @@ erDiagram
 | **Phase A3.2: Ownership Security** | IDOR protection on Tasks, Goals, Daily Progress | ✅ Complete | 251 backend tests passing |
 | **Phase A3.3: Team Authorization** | Squad roles (OWNER, ADMIN, MEMBER), workspace isolation | ✅ Complete | 295 backend tests passing |
 | **Phase A3.4: Collaborative Resources** | Team Goals & Tasks, assignee progress, metadata protection | ✅ Complete | 325 backend tests passing |
-| **Phase A3.5: Security Regression Audit** | Comprehensive JWT, IDOR, RBAC, partial update hardening | ✅ Complete | **332 backend tests passing (0 failures)** |
+| **Phase A3.5: Security Regression Audit** | Comprehensive JWT, IDOR, RBAC, partial update hardening | ✅ Complete | 332 backend tests passing |
+| **Step 5A: Coding Intelligence Foundation** | Multi-platform schema (V12), snapshot architecture, /coding UI | ✅ Complete | **348 backend tests passing (0 failures)** |
 
-### 7.2 Backend Test Suite Breakdown (332 Tests)
+### 7.2 Backend Test Suite Breakdown (348 Tests)
 
 ```
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
-[INFO] Tests run: 332, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 348, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

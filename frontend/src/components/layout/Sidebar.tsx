@@ -9,6 +9,7 @@ import {
   Trophy,
   Medal,
   Code2,
+  Cpu,
   Bell,
   AlarmClock,
   BarChart3,
@@ -58,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { to: '/achievements', label: 'Achievements', icon: Medal },
     { to: '/coding-profiles', label: 'Coding Profiles', icon: Code2 },
+    { to: '/coding', label: 'Coding Intelligence', icon: Cpu },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/reminders', label: 'Reminders', icon: AlarmClock },
     {
