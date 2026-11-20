@@ -34,104 +34,180 @@ Rather than functioning as a generic task-management tool, **DevSync** combines 
 
 DevSync is designed as a **Modular Monolithic Architecture**. The backend is maintained as a cohesive Spring Boot 3.4.3 application divided into decoupled business modules, communicating via strict service contracts and type-safe DTOs without premature distributed-system overhead.
 
-### 2.1 High-Level Architecture
+### 2.1 High-Level Architecture (Full-Stack Request Lifecycle)
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                 Client Layer (React 18 • TypeScript • Vite)                 │
-│  ┌───────────────────────┐   ┌───────────────────┐   ┌───────────────────┐  │
-│  │ Tailwind CSS • Lucide │──▶│  TanStack Query   │──▶│ Axios Interceptor │  │
-│  │  Recharts Visuals     │   │  v5 Server State  │   │  Bearer JWT Auth  │  │
-│  └───────────────────────┘   └───────────────────┘   └─────────┬─────────┘  │
-│                                Command Palette (Ctrl+K) ───────┘            │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ HTTPS REST / JSON
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Security & Filter Pipeline                           │
-│  ┌──────────────┐     ┌────────────────────────┐     ┌───────────────────┐  │
-│  │ CORS Handler │────▶│ JwtAuthenticationFilter │────▶│  SecurityContext  │  │
-│  │ Allowed Web  │     │ (OncePerRequestFilter) │     │ (DevSyncPrincipal)│  │
-│  └──────────────┘     └────────────────────────┘     └─────────┬─────────┘  │
-└──────────────────────────────────────┬─────────────────────────┘
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    Spring Boot Modular Monolith (Java 21)                   │
-│                                                                             │
-│  ┌────────────────────────┐ ┌────────────────────────┐ ┌─────────────────┐  │
-│  │ Auth & User Management │ │ Goals Planning Module  │ │ Task Execution  │  │
-│  └───────────┬────────────┘ └───────────┬────────────┘ └────────┬────────┘  │
-│  ┌───────────┴────────────┐ ┌───────────┴────────────┐ ┌────────┴────────┐  │
-│  │ Daily Progress Tracker │ │ Team Workspaces & RBAC │ │ Gamified XP &   │  │
-│  │ (Owner Scoped Log)     │ │ (Owner, Admin, Member) │ │ Leaderboards    │  │
-│  └───────────┬────────────┘ └───────────┬────────────┘ └────────┬────────┘  │
-│  ┌───────────┴────────────┐ ┌───────────┴────────────┐ ┌────────┴────────┐  │
-│  │ Coding Profiles Track  │ │ Notifications & Alerts │ │ Command Palette │  │
-│  │ (LeetCode, GitHub etc) │ │ In-App & Reminders     │ │ Actions Service │  │
-│  └────────────────────────┘ └────────────────────────┘ └─────────────────┘  │
-│                                       │                                     │
-│                     Centralized Security Foundation                         │
-│         [ CurrentUserProvider ]  ───  [ TeamAuthorizationService ]          │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Persistence & Database Layer                         │
-│                                                                             │
-│  ┌────────────────────────────────────┐    ┌─────────────────────────────┐  │
-│  │  Ownership-Constrained Repositories │───▶│       Hibernate 6 ORM       │  │
-│  │  (findByIdAndOwnerId, Spec API)    │    │ Entity Mapping & Lifecycle  │  │
-│  └────────────────────────────────────┘    └──────────────┬──────────────┘  │
-│                                                           ▼                 │
-│  ┌────────────────────────────────────┐    ┌─────────────────────────────┐  │
-│  │  Flyway Schema Migrations (V1-V11) │───▶│ PostgreSQL 17 Database      │  │
-│  │  Version-controlled DDL & Indices  │    │ Tables, FKs, Unique Checks  │  │
-│  └────────────────────────────────────┘    └─────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
+The end-to-end execution flow of an authenticated developer interaction traversing the client, gateway filter chain, modular monolith backend, and persistence layer:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer (Browser)
+    participant UI as React UI (Tailwind & Recharts)
+    participant Query as TanStack Query (Server State)
+    participant Axios as Axios Client (Bearer Interceptor)
+    participant Filter as JwtAuthenticationFilter
+    participant SecCtx as SecurityContextHolder
+    participant Ctrl as Spring REST Controller (@Valid)
+    participant Svc as Business Service (@Transactional)
+    participant CUP as CurrentUserProvider
+    participant Repo as Ownership JPA Repository
+    participant DB as PostgreSQL 17 Database
+
+    Note over Dev,Axios: Client-Side Interaction & State Management
+    Dev->>UI: Trigger action (e.g. view tasks or log progress)
+    UI->>Query: useQuery() / useMutation()
+    Query->>Axios: Invoke HTTP request
+    Axios->>Axios: Attach Authorization: Bearer JWT header
+    Axios->>Filter: HTTPS REST Request
+
+    Note over Filter,SecCtx: Gateway & Security Pipeline
+    Filter->>Filter: Validate JWT signature & claims (HS256)
+    Filter->>SecCtx: Populate DevSyncPrincipal authentication
+    Filter->>Ctrl: Forward authenticated request
+
+    Note over Ctrl,CUP: Controller & Service Orchestration
+    Ctrl->>Ctrl: Validate payload constraints (@Valid)
+    Ctrl->>Svc: Invoke business operation
+    Svc->>CUP: getCurrentUserId()
+    CUP-->>Svc: Authenticated User UUID
+    Svc->>Svc: Enforce business logic & ownership policies
+
+    Note over Svc,DB: Persistence & Database Layer
+    Svc->>Repo: Query with ownership filter (id, ownerId)
+    Repo->>DB: Execute SQL query with WHERE constraints
+    DB-->>Repo: Return entity record / result set
+    Repo-->>Svc: Return entity / aggregate
+
+    Note over Svc,Dev: Response Propagation & State Synchronization
+    Svc-->>Ctrl: Return Response DTO
+    Ctrl-->>Axios: 200 OK / 201 Created (ApiResponse DTO)
+    Axios-->>Query: Resolve promise & update query cache
+    Query-->>UI: Re-render components with fresh data
+    UI-->>Dev: Display updated view & metrics
 ```
 
-### 2.2 Layered Backend Architecture
+### 2.2 Layered Backend Architecture Execution Lifecycle
 
-Every backend module adheres to strict layer separation:
+Every backend module adheres to strict layer separation, executing within a transactional, security-validated request lifecycle:
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client (Frontend)
+    participant Filter as Security Filter Chain
+    participant Controller as 1. Controller Layer (@Valid)
+    participant Service as 2. Service Layer (@Transactional)
+    participant Provider as CurrentUserProvider
+    participant Repo as 3. Repository Layer (JPQL)
+    participant DB as 4. PostgreSQL Database Layer
+
+    Note over Client,Filter: 1. Request Ingestion & Security Guard
+    Client->>Filter: HTTPS Request + Bearer JWT
+    Filter->>Filter: Verify signature and extract Principal
+    Filter->>Controller: Dispatch to matching @RequestMapping
+
+    Note over Controller,Service: 2. Validation & Business Invariants
+    Controller->>Controller: Validate incoming request body (@Valid)
+    Controller->>Service: Execute business method with validated DTO
+    Service->>Provider: getCurrentUserId()
+    Provider-->>Service: Return authenticated caller UUID
+    Service->>Service: Enforce domain invariants & role checks
+
+    Note over Service,DB: 3. Ownership-Constrained Persistence
+    Service->>Repo: findByIdAndOwnerId(id, ownerId)
+    Repo->>DB: SELECT id, title FROM entity WHERE id = ? AND owner_id = ?
+    DB-->>Repo: Return record
+    Repo-->>Service: Return Optional entity
+
+    Note over Service,Client: 4. Response Serialization & Output
+    Service->>Service: Map Entity to Response DTO
+    Service-->>Controller: Return Response DTO
+    Controller-->>Client: 200 OK / 201 Created (ApiResponse DTO)
 ```
-[ HTTP Request ]
-       │
-       ▼
-1. Controller Layer   ─── Request validation (@Valid DTOs), HTTP status codes, Swagger/OpenAPI docs
-       │
-       ▼
-2. Service Layer      ─── Transaction management (@Transactional), business invariants,
-                          authenticated caller extraction via CurrentUserProvider,
-                          authorization decisions, metric updates
-       │
-       ▼
-3. Repository Layer   ─── Ownership-constrained JPQL queries (e.g. findByIdAndOwnerId),
-                          Spring Data JPA Specifications for dynamic filtering
-       │
-       ▼
-4. Database Layer     ─── PostgreSQL 17 relational storage, schema constraints, Flyway migrations
+
+### 2.3 Frontend Client Architecture & State Lifecycle
+
+The frontend single-page application manages client state, routing guards, asynchronous server synchronization, and optimistic mutations:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Developer (User)
+    participant Router as React Router (ProtectedRoute)
+    participant UI as Page Component (View Layer)
+    participant Query as TanStack Query Cache
+    participant Axios as Axios Interceptor
+    participant API as Backend REST API
+
+    Note over User,Router: 1. Route Guarding & Authentication Check
+    User->>Router: Navigate to protected URL (e.g. /tasks)
+    Router->>Router: Verify JWT token presence & expiration
+    Router->>UI: Mount & render protected component
+
+    Note over UI,Query: 2. Server State Inspection
+    UI->>Query: useQuery(queryKey, queryFn)
+    alt Cache hit & data is fresh
+        Query-->>UI: Serve cached data instantly (0ms latency)
+    else Cache miss or stale
+        Query->>Axios: Execute queryFn() HTTP call
+        Note over Axios,API: 3. Automatic Bearer Injection
+        Axios->>Axios: Intercept & attach Authorization header
+        Axios->>API: GET /api/v1/tasks
+        API-->>Axios: 200 OK (Task list JSON)
+        Axios-->>Query: Resolve data & update cache
+        Query-->>UI: Re-render with server data
+    end
+
+    Note over User,UI: 4. Optimistic UI Mutation
+    User->>UI: Toggle task completion status
+    UI->>Query: useMutation() with onMutate callback
+    Query->>Query: Optimistically update local cache
+    Query-->>UI: Instant visual update on screen
+    Query->>Axios: PATCH /api/v1/tasks/:id/status
+    Axios->>API: Send mutation request
+    API-->>Axios: 200 OK (Confirmed by server)
+    Axios-->>Query: Reconcile cache & invalidate related queries
 ```
 
-### 2.3 Frontend Client Architecture
+### 2.4 Authentication & Session Lifecycle Architecture
 
-```
-[ Browser / Client ]
-       │
-       ▼
-React Router v7       ─── ProtectedRoute (guarded with JWT check) & PublicRoute (login/register)
-       │
-       ▼
-AuthContext           ─── JWT token storage (localStorage/sessionStorage), principal state, logout
-       │
-       ▼
-TanStack Query v5     ─── Stale-while-revalidate caching, optimistic mutations, query invalidation
-       │
-       ▼
-Axios Interceptor     ─── Automatically injects `Authorization: Bearer <jwt>`, handles 401 redirect
-       │
-       ▼
-Pages & Components    ─── Dashboard, Goals, Tasks (Kanban/List), Progress, Teams, Leaderboard,
-                          Command Palette (`Ctrl+K`), Theme Toggle (Dark/Light/System)
+Stateless, cryptographic authentication powered by PBKDF2 password hashing and HS256 signed JSON Web Tokens:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Developer (Client)
+    participant UI as Login / Register UI
+    participant AuthCtrl as AuthController
+    participant AuthSvc as AuthServiceImpl
+    participant Encoder as PasswordEncoder (PBKDF2)
+    participant JWT as JwtTokenProvider
+    participant Repo as UserRepository
+    participant DB as PostgreSQL Database
+
+    Note over User,AuthCtrl: 1. Submission & Ingestion
+    User->>UI: Enter credentials (email, password)
+    UI->>AuthCtrl: POST /api/v1/auth/login (AuthRequest DTO)
+    AuthCtrl->>AuthCtrl: Validate email format & password presence
+
+    Note over AuthCtrl,DB: 2. Password Verification
+    AuthCtrl->>AuthSvc: login(AuthRequest)
+    AuthSvc->>Repo: findByEmailAndActiveTrue(email)
+    Repo->>DB: SELECT id, password_hash FROM users WHERE email = ?
+    DB-->>Repo: Return user record
+    Repo-->>AuthSvc: User entity
+    AuthSvc->>Encoder: matches(rawPassword, storedHash)
+    Encoder->>Encoder: Compute PBKDF2 hash with stored salt
+    Encoder-->>AuthSvc: Credentials verified (true)
+
+    Note over AuthSvc,UI: 3. Token Generation & Session Storage
+    AuthSvc->>JWT: generateToken(UserPrincipal)
+    JWT->>JWT: Sign HS256 JWT with 24-hour expiration
+    JWT-->>AuthSvc: Signed compact JWT string
+    AuthSvc-->>AuthCtrl: AuthResponse (JWT, UserProfile)
+    AuthCtrl-->>UI: 200 OK (ApiResponse with Bearer Token)
+    UI->>UI: Persist JWT in secure storage & update AuthContext
+    UI-->>User: Seamless redirect to /dashboard
 ```
 
 ---
@@ -172,23 +248,37 @@ Pages & Components    ─── Dashboard, Goals, Tasks (Kanban/List), Progress,
 
 ---
 
-## 4. Core Application Modules
+## 4. Core Application Modules Interaction Architecture
 
-```text
-                              ┌─────────────────────────────┐
-                              │ DevSync Developer Workspace │
-                              └──────────────┬──────────────┘
-                                             │
-      ┌──────────────────────┬───────────────┴───────────────┬──────────────────────┐
-      ▼                      ▼                               ▼                      ▼
-┌──────────────────┐   ┌──────────────────┐            ┌──────────────────┐   ┌──────────────────┐
-│   Productivity   │   │  Collaboration   │            │   Gamification   │   │    Utilities     │
-├──────────────────┤   ├──────────────────┤            ├──────────────────┤   ├──────────────────┤
-│ • Goals Planning │   │ • Team Workspace │            │ • Leaderboards   │   │ • JWT Auth & User│
-│ • Task Kanban    │   │ • Squad Roles    │            │ • Milestones & XP│   │ • Dashboard Hub  │
-│ • Daily Standup  │   │ • Shared Goals   │            │ • Coding Profiles│   │ • Notifications  │
-│ • Study Minutes  │   │ • Assigned Tasks │            │   (LeetCode, Git)│   │ • Command Palette│
-└──────────────────┘   └──────────────────┘            └──────────────────┘   └──────────────────┘
+The modular monolith facilitates decoupled, cohesive cross-module communication via strict service interfaces and type-safe events:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer Workspace
+    participant Auth as Auth & User Module
+    participant Goals as Goal Planning Module
+    participant Tasks as Task Execution Module
+    participant Progress as Daily Progress Tracker
+    participant Teams as Team Workspaces & RBAC
+    participant Game as Gamified XP & Leaderboard
+
+    Note over Dev,Tasks: 1. Personal Productivity Workflow
+    Dev->>Goals: Create quarterly milestones (Goal Planning)
+    Goals->>Tasks: Break milestone into actionable Tasks
+    Dev->>Tasks: Execute & update Task status (Kanban Board)
+    Dev->>Progress: Log daily standup, study minutes & challenges
+
+    Note over Progress,Game: 2. Automated Gamification & Growth
+    Progress->>Game: Trigger XP & streak calculation
+    Tasks->>Game: Award completion XP & badges
+    Game->>Game: Update personal streak & calculate leaderboard rank
+
+    Note over Dev,Teams: 3. Team Collaboration Workflow
+    Dev->>Teams: Access Squad Workspace
+    Teams->>Goals: View & manage Collaborative Team Goals
+    Teams->>Tasks: Assign collaborative squad tasks to teammates
+    Teams->>Game: View team-wide productivity rankings
 ```
 
 ### 4.1 Authentication & User Management
@@ -289,6 +379,61 @@ sequenceDiagram
 3. **No Information Leakage (404 Policy)**: Attempting to retrieve, update, or delete another user's private resource by guessing a UUID yields **HTTP 404 Not Found** instead of 403 Forbidden, preventing attackers from confirming whether a foreign UUID exists.
 4. **Identity Spoofing Rejection (403 Policy)**: Attempting to create a resource with another user's identity (e.g. Alice sending Bob's `userId` or `ownerId` in the request body) results in **HTTP 403 Forbidden** (`AccessDeniedException`).
 5. **Parent Relationship Integrity**: Tasks can only be attached to goals owned by the authenticated caller. Assigning a task to another user's goal is rejected with HTTP 404.
+
+### 5.2 Collaborative Team RBAC & Workspace Authorization (Phase A3.4)
+
+DevSync enforces strict separation between personal resources and collaborative squad resources with role-based access control (`OWNER`, `ADMIN`, `MEMBER`):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Team Owner / Admin
+    actor Member as Team Member
+    actor Outsider as Non-Member (Attacker)
+    participant Filter as JwtAuthenticationFilter
+    participant Controller as TeamResourceController
+    participant AuthServ as TeamAuthorizationService
+    participant TaskServ as TaskServiceImpl
+    participant DB as PostgreSQL Database
+
+    Note over Owner,DB: Flow A: Owner or Admin Creates Collaborative Team Task
+    Owner->>Filter: POST /api/v1/tasks (teamTask: true, assigneeId: Member UUID)
+    Filter->>Controller: Authenticated as Owner UUID
+    Controller->>TaskServ: createTask(request)
+    TaskServ->>AuthServ: requireCanManageTeam(teamId)
+    AuthServ->>DB: Query team_members for role IN (OWNER, ADMIN)
+    DB-->>AuthServ: Verified active OWNER role
+    TaskServ->>DB: INSERT INTO tasks (team_task = true, assignee_id = Member)
+    DB-->>TaskServ: Saved Team Task record
+    TaskServ-->>Owner: 201 Created (Team Task DTO)
+
+    Note over Member,DB: Flow B: Assigned Member Updates Progress (Allowed)
+    Member->>Filter: PUT /api/v1/tasks/:id (status: COMPLETED, actualMinutes: 45)
+    Filter->>Controller: Authenticated as Member UUID
+    Controller->>TaskServ: updateTask(taskId, request)
+    TaskServ->>AuthServ: requireActiveMember(teamId)
+    AuthServ-->>TaskServ: Verified active team membership
+    TaskServ->>TaskServ: Allow progress fields update (status, minutes)
+    TaskServ->>DB: UPDATE tasks SET status = COMPLETED, actual_minutes = 45
+    DB-->>TaskServ: Updated record
+    TaskServ-->>Member: 200 OK (Progress Saved)
+
+    Note over Member,Controller: Flow C: Member Attempts Metadata Tampering / Deletion (Rejected)
+    Member->>Filter: DELETE /api/v1/tasks/:id
+    Filter->>Controller: Authenticated as Member UUID
+    Controller->>TaskServ: deleteTask(taskId)
+    TaskServ->>AuthServ: requireCanManageTeam(teamId)
+    AuthServ-->>Controller: throw AccessDeniedException
+    Controller-->>Member: 403 Forbidden (Insufficient Role)
+
+    Note over Outsider,Controller: Flow D: Non-Member Access Attempt (Zero Leakage)
+    Outsider->>Filter: GET /api/v1/tasks/:id
+    Filter->>Controller: Authenticated as Outsider UUID
+    Controller->>TaskServ: getTaskById(taskId)
+    TaskServ->>AuthServ: requireActiveMember(teamId)
+    AuthServ-->>Controller: throw ResourceNotFoundException
+    Controller-->>Outsider: 404 Not Found (Zero Information Leakage)
+```
 
 ---
 
