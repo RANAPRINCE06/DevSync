@@ -68,6 +68,7 @@ export interface CodingStatistics {
   totalProblemsSolved: number | null;
   totalContestsParticipated: number | null;
   highestRating: number | null;
+  highestRatingPlatform?: CodingPlatform | null;
   bestRank: number | null;
   connectedPlatformsCount: number;
   platformBreakdown: Record<string, PlatformSummary>;

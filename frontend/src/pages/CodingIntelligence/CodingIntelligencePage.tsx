@@ -254,10 +254,13 @@ export const CodingIntelligencePage: React.FC = () => {
               <Flame className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-surface-900 dark:text-white">
+          <div className="text-2xl font-bold text-surface-900 dark:text-white flex items-baseline gap-2">
             {isLoadingStats ? '...' : (stats?.highestRating ? Math.round(stats.highestRating) : '—')}
+            {stats?.highestRatingPlatform && (
+              <span className="text-xs font-normal text-surface-500 uppercase">({stats.highestRatingPlatform})</span>
+            )}
           </div>
-          <p className="text-xs text-surface-500 mt-1">Highest competitive contest rating</p>
+          <p className="text-xs text-surface-500 mt-1">Platform-specific peak (scales not cross-comparable)</p>
         </div>
 
         <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
@@ -275,7 +278,7 @@ export const CodingIntelligencePage: React.FC = () => {
 
         <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
           <div className="flex items-center justify-between text-surface-500 dark:text-surface-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Best Global Rank</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Top Reported Rank</span>
             <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
               <Award className="w-4 h-4" />
             </div>
@@ -283,7 +286,7 @@ export const CodingIntelligencePage: React.FC = () => {
           <div className="text-2xl font-bold text-surface-900 dark:text-white">
             {isLoadingStats ? '...' : (stats?.bestRank ? `#${stats.bestRank.toLocaleString()}` : '—')}
           </div>
-          <p className="text-xs text-surface-500 mt-1">Across connected platforms</p>
+          <p className="text-xs text-surface-500 mt-1">Platform-specific leaderboard position</p>
         </div>
       </div>
 
