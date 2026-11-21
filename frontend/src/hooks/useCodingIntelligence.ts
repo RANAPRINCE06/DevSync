@@ -9,6 +9,17 @@ export const CODING_INTELLIGENCE_KEYS = {
   statistics: () => [...CODING_INTELLIGENCE_KEYS.all, 'statistics'] as const,
   syncStatus: () => [...CODING_INTELLIGENCE_KEYS.all, 'syncStatus'] as const,
   history: (accountId: string) => [...CODING_INTELLIGENCE_KEYS.all, 'history', accountId] as const,
+  analyticsOverview: () => [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'overview'] as const,
+  ratingHistory: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
+    [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'rating-history', params] as const,
+  problemDistribution: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
+    [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'problem-distribution', params] as const,
+  codingActivity: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
+    [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'activity', params] as const,
+  contestPerformance: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
+    [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'contest-performance', params] as const,
+  performanceInsights: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
+    [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'insights', params] as const,
 };
 
 export const useConnectedAccounts = () => {
@@ -89,5 +100,47 @@ export const useSyncPlatform = () => {
     onError: (error: Error) => {
       showToast('error', error.message || 'Failed to synchronize platform profile');
     },
+  });
+};
+
+export const useCodingAnalyticsOverview = () => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.analyticsOverview(),
+    queryFn: () => codingIntelligenceService.getAnalyticsOverview(),
+  });
+};
+
+export const useRatingHistory = (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.ratingHistory(params),
+    queryFn: () => codingIntelligenceService.getRatingHistory(params),
+  });
+};
+
+export const useProblemDistribution = (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.problemDistribution(params),
+    queryFn: () => codingIntelligenceService.getProblemDistribution(params),
+  });
+};
+
+export const useCodingActivity = (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.codingActivity(params),
+    queryFn: () => codingIntelligenceService.getCodingActivity(params),
+  });
+};
+
+export const useContestPerformance = (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.contestPerformance(params),
+    queryFn: () => codingIntelligenceService.getContestPerformance(params),
+  });
+};
+
+export const usePerformanceInsights = (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.performanceInsights(params),
+    queryFn: () => codingIntelligenceService.getPerformanceInsights(params),
   });
 };

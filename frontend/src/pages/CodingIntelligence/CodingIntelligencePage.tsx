@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Code2,
   ExternalLink,
@@ -25,8 +25,19 @@ import {
   useDisconnectPlatform,
   useSyncPlatform,
   usePlatformHistory,
+  useRatingHistory,
+  useProblemDistribution,
+  useCodingActivity,
+  useContestPerformance,
+  usePerformanceInsights,
 } from '@/hooks/useCodingIntelligence';
 import { HistoricalStatsChart } from './HistoricalStatsChart';
+import { AnalyticsHeader } from './components/AnalyticsHeader';
+import { PerformanceInsightsSection } from './components/PerformanceInsightsSection';
+import { RatingProgressionSection } from './components/RatingProgressionSection';
+import { ProblemDistributionSection } from './components/ProblemDistributionSection';
+import { ContestPerformanceSection } from './components/ContestPerformanceSection';
+import { CodingActivitySection } from './components/CodingActivitySection';
 
 const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
   LEETCODE: {
@@ -114,6 +125,25 @@ export const CodingIntelligencePage: React.FC = () => {
   const [usernameInput, setUsernameInput] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [activeHistoryAccountId, setActiveHistoryAccountId] = useState<string | null>(null);
+
+  // Analytics Filters State
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
+  const [analyticsPlatform, setAnalyticsPlatform] = useState<CodingPlatform | 'ALL'>('ALL');
+
+  const analyticsParams = useMemo(() => ({
+    period: analyticsPeriod,
+    platform: analyticsPlatform !== 'ALL' ? analyticsPlatform : undefined,
+  }), [analyticsPeriod, analyticsPlatform]);
+
+  const { data: insightsData, isLoading: isLoadingInsights } = usePerformanceInsights(analyticsParams);
+  const { data: ratingData, isLoading: isLoadingRating } = useRatingHistory(analyticsParams);
+  const { data: problemData, isLoading: isLoadingProblem } = useProblemDistribution(analyticsParams);
+  const { data: activityData, isLoading: isLoadingActivity } = useCodingActivity(analyticsParams);
+  const { data: contestData, isLoading: isLoadingContest } = useContestPerformance(analyticsParams);
+
+  const availableConnectedPlatforms = useMemo(() => {
+    return accounts.filter((a) => a.active).map((a) => a.platform);
+  }, [accounts]);
 
   const { data: snapshotHistory = [], isLoading: isLoadingHistory } = usePlatformHistory(activeHistoryAccountId);
 
@@ -257,6 +287,45 @@ export const CodingIntelligencePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Advanced Analytics Control Bar */}
+      <AnalyticsHeader
+        selectedPeriod={analyticsPeriod}
+        onPeriodChange={setAnalyticsPeriod}
+        selectedPlatform={analyticsPlatform}
+        onPlatformChange={setAnalyticsPlatform}
+        availablePlatforms={availableConnectedPlatforms}
+      />
+
+      {/* Performance Insights Section */}
+      <PerformanceInsightsSection
+        insightsData={insightsData}
+        isLoading={isLoadingInsights}
+      />
+
+      {/* Rating Progression Line Chart */}
+      <RatingProgressionSection
+        ratingData={ratingData}
+        isLoading={isLoadingRating}
+      />
+
+      {/* Problem Distribution & Categorized Tiers */}
+      <ProblemDistributionSection
+        problemData={problemData}
+        isLoading={isLoadingProblem}
+      />
+
+      {/* Contest Performance & Competitive History */}
+      <ContestPerformanceSection
+        contestData={contestData}
+        isLoading={isLoadingContest}
+      />
+
+      {/* Coding Activity & Snapshot Telemetry Coverage */}
+      <CodingActivitySection
+        activityData={activityData}
+        isLoading={isLoadingActivity}
+      />
+
       {/* Historical Performance Chart Section */}
       {activeHistoryAccountId && (
         <div className="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-sm space-y-4">
@@ -296,7 +365,7 @@ export const CodingIntelligencePage: React.FC = () => {
             <Globe className="w-5 h-5 text-primary-500" />
             Supported Platforms ({accounts.length} / 6 connected)
           </h2>
-          <span className="text-xs text-surface-500">Step 5D Reliability Engine</span>
+          <span className="text-xs text-surface-500">Step 5E Advanced Analytics Engine</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -90,3 +90,150 @@ export interface PlatformConfig {
   usernameRegex: RegExp;
   usernamePlaceholder: string;
 }
+
+export interface AnalyticsQueryParams {
+  platform?: CodingPlatform;
+  from?: string;
+  to?: string;
+  period?: '7d' | '30d' | '90d' | '1y' | 'all';
+}
+
+export interface PlatformOverviewItem {
+  platform: CodingPlatform;
+  username: string;
+  problemsSolved: number | null;
+  currentRating: number | null;
+  globalRank: number | null;
+  contestsParticipated: number | null;
+  lastSyncedAt: string | null;
+}
+
+export interface CodingAnalyticsOverview {
+  totalProblemsSolved: number;
+  connectedPlatformsCount: number;
+  highestRating: number | null;
+  highestRatingPlatform: CodingPlatform | null;
+  totalContestsParticipated: number;
+  totalSnapshotsCollected: number;
+  firstSnapshotAt: string | null;
+  lastSnapshotAt: string | null;
+  platformOverviews: PlatformOverviewItem[];
+}
+
+export interface RatingPoint {
+  timestamp: string;
+  rating: number;
+  globalRank: number | null;
+}
+
+export interface PlatformRatingSeries {
+  platform: CodingPlatform;
+  username: string;
+  currentRating: number | null;
+  maximumRating: number | null;
+  personalBestRating: number | null;
+  ratingChange: number | null;
+  dataAvailable: boolean;
+  history: RatingPoint[];
+}
+
+export interface RatingHistoryResponse {
+  period: string;
+  from: string | null;
+  to: string | null;
+  platforms: PlatformRatingSeries[];
+}
+
+export interface PlatformProblemBreakdown {
+  platform: CodingPlatform;
+  username: string;
+  totalSolved: number;
+  easySolved: number | null;
+  mediumSolved: number | null;
+  hardSolved: number | null;
+  percentageOfTotal: number;
+  deltaInPeriod: number | null;
+}
+
+export interface ProblemDistributionResponse {
+  period: string;
+  from: string | null;
+  to: string | null;
+  totalPlatformReportedSolved: number;
+  easySolved: number;
+  mediumSolved: number;
+  hardSolved: number;
+  unclassifiedSolved: number;
+  solvedDeltaInPeriod: number;
+  verifiedUniqueDeduplication: boolean;
+  deduplicationNote: string;
+  platformBreakdowns: PlatformProblemBreakdown[];
+}
+
+export interface SnapshotActivityRecord {
+  timestamp: string;
+  platform: CodingPlatform;
+  username: string;
+  problemsSolved: number | null;
+  currentRating: number | null;
+  solvedChange: number | null;
+  ratingChange: number | null;
+}
+
+export interface CodingActivityResponse {
+  period: string;
+  from: string | null;
+  to: string | null;
+  dailySubmissionActivitySupported: boolean;
+  coverageNotice: string;
+  totalSnapshotsInPeriod: number;
+  activeDaysWithSnapshots: number;
+  firstSnapshotAt: string | null;
+  lastSnapshotAt: string | null;
+  syncCadenceDescription: string;
+  snapshotTimeline: SnapshotActivityRecord[];
+}
+
+export interface ContestRatingPoint {
+  timestamp: string;
+  rating: number | null;
+  contestsCount: number | null;
+}
+
+export interface PlatformContestRecord {
+  platform: CodingPlatform;
+  username: string;
+  contestsSupported: boolean;
+  contestsParticipated: number | null;
+  currentRating: number | null;
+  bestRating: number | null;
+  ratingChange: number | null;
+  contestHistory: ContestRatingPoint[];
+}
+
+export interface ContestPerformanceResponse {
+  period: string;
+  from: string | null;
+  to: string | null;
+  totalContestsParticipated: number;
+  anyContestsSupported: boolean;
+  platformContests: PlatformContestRecord[];
+}
+
+export interface PerformanceInsightItem {
+  id: string;
+  platform: CodingPlatform | null;
+  category: 'RATING' | 'SOLVED' | 'CONTEST' | 'DATA_COVERAGE';
+  type: 'POSITIVE' | 'NEUTRAL' | 'INFORMATIONAL' | 'ATTENTION';
+  title: string;
+  message: string;
+  metricValue: string;
+}
+
+export interface PerformanceInsightsResponse {
+  period: string;
+  from: string | null;
+  to: string | null;
+  insightsCount: number;
+  insights: PerformanceInsightItem[];
+}

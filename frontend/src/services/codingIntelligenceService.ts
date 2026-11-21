@@ -63,4 +63,62 @@ export const codingIntelligenceService = {
     const response = await apiClient.get<ApiResponse<PlatformStatSnapshot[]>>(`/coding/accounts/${accountId}/history`);
     return response.data.data;
   },
+
+  /**
+   * Retrieves high-level analytics overview
+   */
+  async getAnalyticsOverview(): Promise<import('@/types/codingIntelligence').CodingAnalyticsOverview> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').CodingAnalyticsOverview>>('/coding/analytics/overview');
+    return response.data.data;
+  },
+
+  /**
+   * Retrieves rating progression history
+   */
+  async getRatingHistory(params?: import('@/types/codingIntelligence').AnalyticsQueryParams): Promise<import('@/types/codingIntelligence').RatingHistoryResponse> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').RatingHistoryResponse>>('/coding/analytics/rating-history', {
+      params,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Retrieves problem-solving distribution
+   */
+  async getProblemDistribution(params?: import('@/types/codingIntelligence').AnalyticsQueryParams): Promise<import('@/types/codingIntelligence').ProblemDistributionResponse> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').ProblemDistributionResponse>>('/coding/analytics/problem-distribution', {
+      params,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Retrieves coding snapshot activity timeline
+   */
+  async getCodingActivity(params?: import('@/types/codingIntelligence').AnalyticsQueryParams): Promise<import('@/types/codingIntelligence').CodingActivityResponse> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').CodingActivityResponse>>('/coding/analytics/activity', {
+      params,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Retrieves contest performance metrics
+   */
+  async getContestPerformance(params?: import('@/types/codingIntelligence').AnalyticsQueryParams): Promise<import('@/types/codingIntelligence').ContestPerformanceResponse> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').ContestPerformanceResponse>>('/coding/analytics/contest-performance', {
+      params,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Retrieves factual data-backed performance insights
+   */
+  async getPerformanceInsights(params?: import('@/types/codingIntelligence').AnalyticsQueryParams): Promise<import('@/types/codingIntelligence').PerformanceInsightsResponse> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').PerformanceInsightsResponse>>('/coding/analytics/insights', {
+      params,
+    });
+    return response.data.data;
+  },
 };
