@@ -12,6 +12,7 @@ export interface PlatformAccount {
   id: string;
   userId: string;
   platform: CodingPlatform;
+  platformDisplayName?: string;
   username: string;
   profileUrl: string;
   active: boolean;
@@ -19,6 +20,7 @@ export interface PlatformAccount {
   lastSyncedAt: string | null;
   lastSyncAttemptAt: string | null;
   lastSyncError: string | null;
+  latestSnapshot?: PlatformStatSnapshot | null;
   createdAt: string;
   updatedAt: string;
 }

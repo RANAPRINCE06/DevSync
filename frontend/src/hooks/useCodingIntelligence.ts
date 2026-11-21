@@ -66,3 +66,24 @@ export const useDisconnectPlatform = () => {
     },
   });
 };
+
+export const useSyncPlatform = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation({
+    mutationFn: (accountId: string) =>
+      codingIntelligenceService.syncAccount(accountId),
+    onSuccess: (data) => {
+      if (data.syncStatus === 'FAILED') {
+        showToast('warning', `Sync failed for ${data.platform}: ${data.lastSyncError || 'Unknown error'}`);
+      } else {
+        showToast('success', `Successfully synchronized ${data.platform} (@${data.username})`);
+      }
+      queryClient.invalidateQueries({ queryKey: CODING_INTELLIGENCE_KEYS.all });
+    },
+    onError: (error: Error) => {
+      showToast('error', error.message || 'Failed to synchronize platform profile');
+    },
+  });
+};

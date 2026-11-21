@@ -68,6 +68,17 @@ public class CodingProfileController {
         return ResponseEntity.ok(ApiResponse.success("Platform account disconnected successfully", null));
     }
 
+    @PostMapping("/accounts/{accountId}/sync")
+    @Operation(summary = "Synchronize platform account", description = "Fetch and update statistics from the external platform for an owned account")
+    public ResponseEntity<ApiResponse<PlatformAccountResponse>> syncAccount(
+            @PathVariable UUID accountId) {
+        PlatformAccountResponse response = codingProfileService.syncAccount(accountId);
+        String message = response.getSyncStatus() == com.devsync.coding.enums.SyncStatus.SUCCESS
+                ? "Platform account synchronized successfully"
+                : "Platform synchronization encountered an error: " + response.getLastSyncError();
+        return ResponseEntity.ok(ApiResponse.success(message, response));
+    }
+
     @GetMapping("/statistics")
     @Operation(summary = "Get coding statistics", description = "Retrieve aggregated statistics across all connected platform accounts for the authenticated user")
     public ResponseEntity<ApiResponse<CodingStatisticsResponse>> getCodingStatistics() {

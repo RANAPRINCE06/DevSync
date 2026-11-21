@@ -48,3 +48,25 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION:86400000}
+  coding:
+    integration:
+      connect-timeout-ms: 5000
+      read-timeout-ms: 10000
+      codeforces:
+        base-url: ${CODEFORCES_API_URL:https://codeforces.com/api}
+        enabled: true
+      github:
+        base-url: ${GITHUB_API_URL:https://api.github.com}
+        enabled: true
+      leetcode:
+        base-url: ${LEETCODE_API_URL:https://leetcode.com/graphql}
+        enabled: true
+      codechef:
+        base-url: ${CODECHEF_API_URL:https://api.codechef.com}
+        enabled: false
+      hackerrank:
+        base-url: ${HACKERRANK_API_URL:https://www.hackerrank.com/api}
+        enabled: false
+      atcoder:
+        base-url: ${ATCODER_API_URL:https://atcoder.jp/api}
+        enabled: false

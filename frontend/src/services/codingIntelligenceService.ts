@@ -33,6 +33,14 @@ export const codingIntelligenceService = {
   },
 
   /**
+   * Triggers manual synchronization of external profile statistics
+   */
+  async syncAccount(accountId: string): Promise<PlatformAccount> {
+    const response = await apiClient.post<ApiResponse<PlatformAccount>>(`/coding/accounts/${accountId}/sync`);
+    return response.data.data;
+  },
+
+  /**
    * Retrieves sync statuses for all connected platforms
    */
   async getSyncStatuses(): Promise<PlatformSyncStatus[]> {

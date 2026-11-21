@@ -19,5 +19,7 @@ public interface CodingProfileService {
 
     void disconnectAccount(UUID accountId);
 
+    PlatformAccountResponse syncAccount(UUID accountId);
+
     Page<PlatformStatSnapshotResponse> getAccountHistory(UUID accountId, Pageable pageable);
 }

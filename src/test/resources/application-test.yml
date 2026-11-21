@@ -18,3 +18,25 @@ app:
   jwt:
     secret: dGVzdC1kZXZzeW5jLWp3dC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW9ubHktZG8tbm90LXVzZS1pbi1wcm9k
     expiration-ms: 3600000
+  coding:
+    integration:
+      connect-timeout-ms: 2000
+      read-timeout-ms: 3000
+      codeforces:
+        base-url: https://codeforces.com/api
+        enabled: true
+      github:
+        base-url: https://api.github.com
+        enabled: true
+      leetcode:
+        base-url: https://leetcode.com/graphql
+        enabled: true
+      codechef:
+        base-url: https://api.codechef.com
+        enabled: false
+      hackerrank:
+        base-url: https://www.hackerrank.com/api
+        enabled: false
+      atcoder:
+        base-url: https://atcoder.jp/api
+        enabled: false

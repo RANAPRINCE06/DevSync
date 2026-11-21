@@ -23,6 +23,7 @@ import {
   useCodingStatistics,
   useConnectPlatform,
   useDisconnectPlatform,
+  useSyncPlatform,
   usePlatformHistory,
 } from '@/hooks/useCodingIntelligence';
 import { HistoricalStatsChart } from './HistoricalStatsChart';
@@ -107,6 +108,7 @@ export const CodingIntelligencePage: React.FC = () => {
   const { data: stats, isLoading: isLoadingStats } = useCodingStatistics();
   const connectMutation = useConnectPlatform();
   const disconnectMutation = useDisconnectPlatform();
+  const syncMutation = useSyncPlatform();
 
   const [selectedPlatform, setSelectedPlatform] = useState<CodingPlatform | null>(null);
   const [usernameInput, setUsernameInput] = useState('');
@@ -348,7 +350,17 @@ export const CodingIntelligencePage: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-surface-500">Sync Status:</span>
-                        <span className="font-medium text-surface-700 dark:text-surface-300">
+                        <span
+                          className={`font-semibold px-1.5 py-0.5 rounded text-[10px] ${
+                            account.syncStatus === 'SUCCESS'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                              : account.syncStatus === 'FAILED'
+                              ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                              : account.syncStatus === 'PENDING'
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                              : 'bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300'
+                          }`}
+                        >
                           {account.syncStatus}
                         </span>
                       </div>
@@ -356,10 +368,62 @@ export const CodingIntelligencePage: React.FC = () => {
                         <span className="text-surface-500">Last Synced:</span>
                         <span className="text-surface-500">
                           {account.lastSyncedAt
-                            ? new Date(account.lastSyncedAt).toLocaleDateString()
-                            : 'Pending (Step 5B)'}
+                            ? new Date(account.lastSyncedAt).toLocaleString()
+                            : 'Never synced'}
                         </span>
                       </div>
+
+                      {account.syncStatus === 'FAILED' && account.lastSyncError && (
+                        <div className="p-2 mt-2 rounded bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span className="break-all">{account.lastSyncError}</span>
+                        </div>
+                      )}
+
+                      {account.latestSnapshot && (
+                        <div className="pt-2 mt-2 border-t border-surface-200/60 dark:border-surface-700/60 grid grid-cols-2 gap-2 text-xs">
+                          {account.latestSnapshot.problemsSolved != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Solved</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                {account.latestSnapshot.problemsSolved}
+                              </span>
+                            </div>
+                          )}
+                          {account.latestSnapshot.currentRating != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Rating</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                {account.latestSnapshot.currentRating}
+                              </span>
+                            </div>
+                          )}
+                          {account.latestSnapshot.globalRank != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Rank</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                #{account.latestSnapshot.globalRank.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {account.platform === 'GITHUB' && account.latestSnapshot.additionalStats?.publicRepos != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Public Repos</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                {String(account.latestSnapshot.additionalStats.publicRepos)}
+                              </span>
+                            </div>
+                          )}
+                          {account.platform === 'GITHUB' && account.latestSnapshot.additionalStats?.totalStars != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Total Stars</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                ★ {String(account.latestSnapshot.additionalStats.totalStars)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -367,17 +431,28 @@ export const CodingIntelligencePage: React.FC = () => {
                 <div className="pt-2 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between gap-2">
                   {isConnected && account ? (
                     <>
-                      <button
-                        onClick={() =>
-                          setActiveHistoryAccountId(
-                            activeHistoryAccountId === account.id ? null : account.id
-                          )
-                        }
-                        className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        {activeHistoryAccountId === account.id ? 'Hide History' : 'View History'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => syncMutation.mutate(account.id)}
+                          disabled={syncMutation.isPending}
+                          className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1 disabled:opacity-50"
+                          title="Synchronize live statistics from platform"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                          Sync
+                        </button>
+                        <button
+                          onClick={() =>
+                            setActiveHistoryAccountId(
+                              activeHistoryAccountId === account.id ? null : account.id
+                            )
+                          }
+                          className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          {activeHistoryAccountId === account.id ? 'Hide' : 'History'}
+                        </button>
+                      </div>
                       <button
                         onClick={() => handleDisconnect(account.id)}
                         disabled={disconnectMutation.isPending}
