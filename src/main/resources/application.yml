@@ -70,3 +70,8 @@ app:
       atcoder:
         base-url: ${ATCODER_API_URL:https://atcoder.jp/api}
         enabled: false
+    sync:
+      enabled: ${CODING_SYNC_ENABLED:true}
+      fixed-delay-ms: ${CODING_SYNC_FIXED_DELAY_MS:21600000}
+      initial-delay-ms: ${CODING_SYNC_INITIAL_DELAY_MS:60000}
+      max-concurrent-workers: 4

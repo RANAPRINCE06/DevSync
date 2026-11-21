@@ -15,6 +15,10 @@ export const useConnectedAccounts = () => {
   return useQuery({
     queryKey: CODING_INTELLIGENCE_KEYS.accounts(),
     queryFn: () => codingIntelligenceService.getConnectedAccounts(),
+    refetchInterval: (query) => {
+      const hasPending = query.state.data?.some((acc) => acc.syncStatus === 'PENDING');
+      return hasPending ? 3000 : false;
+    },
   });
 };
 

@@ -351,16 +351,19 @@ export const CodingIntelligencePage: React.FC = () => {
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-surface-500">Sync Status:</span>
                         <span
-                          className={`font-semibold px-1.5 py-0.5 rounded text-[10px] ${
+                          className={`font-semibold px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1 ${
                             account.syncStatus === 'SUCCESS'
                               ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                               : account.syncStatus === 'FAILED'
                               ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
                               : account.syncStatus === 'PENDING'
-                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 animate-pulse'
                               : 'bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300'
                           }`}
                         >
+                          {account.syncStatus === 'PENDING' && (
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          )}
                           {account.syncStatus}
                         </span>
                       </div>
@@ -370,6 +373,22 @@ export const CodingIntelligencePage: React.FC = () => {
                           {account.lastSyncedAt
                             ? new Date(account.lastSyncedAt).toLocaleString()
                             : 'Never synced'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-surface-500">Last Attempt:</span>
+                        <span className="text-surface-500">
+                          {account.lastSyncAttemptAt
+                            ? new Date(account.lastSyncAttemptAt).toLocaleString()
+                            : 'None'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-surface-500">Next Auto-Sync:</span>
+                        <span className="text-surface-500 font-mono text-[11px]">
+                          {account.lastSyncedAt
+                            ? `~${new Date(new Date(account.lastSyncedAt).getTime() + 6 * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Every 6 hours'}
                         </span>
                       </div>
 
@@ -434,12 +453,18 @@ export const CodingIntelligencePage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => syncMutation.mutate(account.id)}
-                          disabled={syncMutation.isPending}
+                          disabled={syncMutation.isPending || account.syncStatus === 'PENDING'}
                           className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1 disabled:opacity-50"
                           title="Synchronize live statistics from platform"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                          Sync
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${
+                              syncMutation.isPending || account.syncStatus === 'PENDING'
+                                ? 'animate-spin'
+                                : ''
+                            }`}
+                          />
+                          {account.syncStatus === 'PENDING' ? 'Syncing...' : 'Sync'}
                         </button>
                         <button
                           onClick={() =>

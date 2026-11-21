@@ -1,0 +1,182 @@
+package com.devsync.coding.sync.service;
+
+import com.devsync.coding.entity.PlatformAccount;
+import com.devsync.coding.entity.PlatformStatSnapshot;
+import com.devsync.coding.enums.SyncStatus;
+import com.devsync.coding.integration.CodingPlatformAdapter;
+import com.devsync.coding.integration.dto.ExternalProfileData;
+import com.devsync.coding.integration.exception.PlatformIntegrationException;
+import com.devsync.coding.integration.registry.PlatformIntegrationRegistry;
+import com.devsync.coding.repository.PlatformAccountRepository;
+import com.devsync.coding.repository.PlatformStatSnapshotRepository;
+import com.devsync.coding.sync.dto.PlatformSyncResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Executes a single platform account synchronization lifecycle:
+ * PENDING -> SUCCESS or PENDING -> FAILED.
+ * Normalizes statistics, persists point-in-time snapshots, avoids redundant snapshots,
+ * and preserves historical snapshots on error.
+ */
+@Component
+public class PlatformSyncWorker {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformSyncWorker.class);
+
+    private final PlatformIntegrationRegistry platformIntegrationRegistry;
+    private final PlatformAccountRepository platformAccountRepository;
+    private final PlatformStatSnapshotRepository platformStatSnapshotRepository;
+
+    public PlatformSyncWorker(PlatformIntegrationRegistry platformIntegrationRegistry,
+                              PlatformAccountRepository platformAccountRepository,
+                              PlatformStatSnapshotRepository platformStatSnapshotRepository) {
+        this.platformIntegrationRegistry = platformIntegrationRegistry;
+        this.platformAccountRepository = platformAccountRepository;
+        this.platformStatSnapshotRepository = platformStatSnapshotRepository;
+    }
+
+    /**
+     * Executes the end-to-end sync lifecycle for an individual platform account.
+     *
+     * @param account the platform account to synchronize
+     * @return PlatformSyncResult indicating success/failure and snapshot creation
+     */
+    @Transactional
+    public PlatformSyncResult executeSync(PlatformAccount account) {
+        if (!account.isActive()) {
+            log.info("Skipping inactive/disconnected platform account: {}", account.getId());
+            return PlatformSyncResult.builder()
+                    .accountId(account.getId())
+                    .platform(account.getPlatform())
+                    .username(account.getUsername())
+                    .status(account.getSyncStatus())
+                    .snapshotCreated(false)
+                    .inFlightSkipped(false)
+                    .timestamp(Instant.now())
+                    .errorMessage("Account is disconnected/inactive")
+                    .build();
+        }
+
+        Instant attemptTime = Instant.now();
+        account.setSyncStatus(SyncStatus.PENDING);
+        account.setLastSyncAttemptAt(attemptTime);
+        platformAccountRepository.saveAndFlush(account);
+
+        log.info("Starting synchronization for platform account [{}] platform={} username={}",
+                account.getId(), account.getPlatform(), account.getUsername());
+
+        try {
+            CodingPlatformAdapter adapter = platformIntegrationRegistry.getRequiredAdapter(account.getPlatform());
+            ExternalProfileData profileData = adapter.fetchProfileData(account.getUsername());
+
+            if (profileData == null) {
+                throw new PlatformIntegrationException("Platform adapter returned null profile data for " + account.getUsername());
+            }
+
+            Optional<PlatformStatSnapshot> latestSnapshotOpt = platformStatSnapshotRepository
+                    .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
+
+            boolean snapshotCreated = false;
+            if (latestSnapshotOpt.isEmpty() || !isSameStatistics(latestSnapshotOpt.get(), profileData)) {
+                PlatformStatSnapshot newSnapshot = PlatformStatSnapshot.builder()
+                        .platformAccount(account)
+                        .currentRating(profileData.getCurrentRating())
+                        .maximumRating(profileData.getMaximumRating())
+                        .globalRank(profileData.getGlobalRank())
+                        .countryRank(profileData.getCountryRank())
+                        .problemsSolved(profileData.getProblemsSolved())
+                        .easySolved(profileData.getEasySolved())
+                        .mediumSolved(profileData.getMediumSolved())
+                        .hardSolved(profileData.getHardSolved())
+                        .contestsParticipated(profileData.getContestsParticipated())
+                        .additionalStats(profileData.getAdditionalStats())
+                        .snapshotAt(profileData.getFetchedAt() != null ? profileData.getFetchedAt() : Instant.now())
+                        .build();
+
+                platformStatSnapshotRepository.saveAndFlush(newSnapshot);
+                snapshotCreated = true;
+                log.info("Persisted fresh statistics snapshot for account [{}] (snapshotCreated=true)", account.getId());
+            } else {
+                log.info("Statistics unchanged for account [{}]; duplicate snapshot suppressed", account.getId());
+            }
+
+            account.setSyncStatus(SyncStatus.SUCCESS);
+            account.setLastSyncedAt(Instant.now());
+            account.setLastSyncError(null);
+            platformAccountRepository.saveAndFlush(account);
+
+            return PlatformSyncResult.builder()
+                    .accountId(account.getId())
+                    .platform(account.getPlatform())
+                    .username(account.getUsername())
+                    .status(SyncStatus.SUCCESS)
+                    .snapshotCreated(snapshotCreated)
+                    .inFlightSkipped(false)
+                    .timestamp(Instant.now())
+                    .errorMessage(null)
+                    .build();
+
+        } catch (Exception ex) {
+            String sanitizedError = sanitizeErrorMessage(ex.getMessage());
+            log.warn("Synchronization failed for account [{}] platform={}: {}",
+                    account.getId(), account.getPlatform(), sanitizedError);
+
+            account.setSyncStatus(SyncStatus.FAILED);
+            account.setLastSyncError(sanitizedError);
+            platformAccountRepository.saveAndFlush(account);
+
+            return PlatformSyncResult.builder()
+                    .accountId(account.getId())
+                    .platform(account.getPlatform())
+                    .username(account.getUsername())
+                    .status(SyncStatus.FAILED)
+                    .snapshotCreated(false)
+                    .inFlightSkipped(false)
+                    .timestamp(Instant.now())
+                    .errorMessage(sanitizedError)
+                    .build();
+        }
+    }
+
+    private boolean isSameStatistics(PlatformStatSnapshot s, ExternalProfileData d) {
+        boolean sameStatsMap = isSameMap(s.getAdditionalStats(), d.getAdditionalStats());
+        return Objects.equals(s.getCurrentRating(), d.getCurrentRating()) &&
+                Objects.equals(s.getMaximumRating(), d.getMaximumRating()) &&
+                Objects.equals(s.getGlobalRank(), d.getGlobalRank()) &&
+                Objects.equals(s.getCountryRank(), d.getCountryRank()) &&
+                Objects.equals(s.getProblemsSolved(), d.getProblemsSolved()) &&
+                Objects.equals(s.getEasySolved(), d.getEasySolved()) &&
+                Objects.equals(s.getMediumSolved(), d.getMediumSolved()) &&
+                Objects.equals(s.getHardSolved(), d.getHardSolved()) &&
+                Objects.equals(s.getContestsParticipated(), d.getContestsParticipated()) &&
+                sameStatsMap;
+    }
+
+    private boolean isSameMap(Map<String, Object> m1, Map<String, Object> m2) {
+        boolean m1Empty = (m1 == null || m1.isEmpty());
+        boolean m2Empty = (m2 == null || m2.isEmpty());
+        if (m1Empty && m2Empty) {
+            return true;
+        }
+        return Objects.equals(m1, m2);
+    }
+
+    public String sanitizeErrorMessage(String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return "Unknown platform synchronization error";
+        }
+        String sanitized = message.replaceAll("(?i)(password|secret|token|key|authorization)=[^\s&]+", "$1=***");
+        if (sanitized.length() > 500) {
+            sanitized = sanitized.substring(0, 497) + "...";
+        }
+        return sanitized;
+    }
+}

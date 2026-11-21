@@ -40,3 +40,8 @@ app:
       atcoder:
         base-url: https://atcoder.jp/api
         enabled: false
+    sync:
+      enabled: false
+      fixed-delay-ms: 60000
+      initial-delay-ms: 10000
+      max-concurrent-workers: 2

@@ -15,6 +15,7 @@ import com.devsync.coding.integration.registry.PlatformIntegrationRegistry;
 import com.devsync.coding.mapper.CodingProfileMapper;
 import com.devsync.coding.repository.PlatformAccountRepository;
 import com.devsync.coding.repository.PlatformStatSnapshotRepository;
+import com.devsync.coding.sync.service.PlatformSyncService;
 import com.devsync.common.exception.BadRequestException;
 import com.devsync.common.exception.ResourceNotFoundException;
 import com.devsync.user.entity.User;
@@ -26,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,18 +38,18 @@ public class CodingProfileServiceImpl implements CodingProfileService {
     private final PlatformStatSnapshotRepository platformStatSnapshotRepository;
     private final UserRepository userRepository;
     private final CurrentUserProvider currentUserProvider;
-    private final PlatformIntegrationRegistry platformIntegrationRegistry;
+    private final PlatformSyncService platformSyncService;
 
     public CodingProfileServiceImpl(PlatformAccountRepository platformAccountRepository,
                                     PlatformStatSnapshotRepository platformStatSnapshotRepository,
                                     UserRepository userRepository,
                                     CurrentUserProvider currentUserProvider,
-                                    PlatformIntegrationRegistry platformIntegrationRegistry) {
+                                    PlatformSyncService platformSyncService) {
         this.platformAccountRepository = platformAccountRepository;
         this.platformStatSnapshotRepository = platformStatSnapshotRepository;
         this.userRepository = userRepository;
         this.currentUserProvider = currentUserProvider;
-        this.platformIntegrationRegistry = platformIntegrationRegistry;
+        this.platformSyncService = platformSyncService;
     }
 
     @Override
@@ -127,97 +127,7 @@ public class CodingProfileServiceImpl implements CodingProfileService {
     @Transactional
     public PlatformAccountResponse syncAccount(UUID accountId) {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        PlatformAccount account = platformAccountRepository.findByIdAndUserIdAndActiveTrue(accountId, currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Platform account not found: " + accountId));
-
-        CodingPlatformAdapter adapter = platformIntegrationRegistry.getRequiredAdapter(account.getPlatform());
-        account.setLastSyncAttemptAt(Instant.now());
-
-        try {
-            ExternalProfileData data = adapter.fetchProfileData(account.getUsername());
-            if (data == null) {
-                throw new PlatformIntegrationException("External platform adapter returned empty data");
-            }
-
-            // Check if statistics are identical to the latest snapshot (avoid duplicate snapshot creation)
-            Optional<PlatformStatSnapshot> latestOpt = platformStatSnapshotRepository
-                    .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
-
-            PlatformStatSnapshot snapshotToReturn;
-            if (latestOpt.isPresent() && isSameStatistics(latestOpt.get(), data)) {
-                snapshotToReturn = latestOpt.get();
-            } else {
-                PlatformStatSnapshot newSnapshot = PlatformStatSnapshot.builder()
-                        .platformAccount(account)
-                        .currentRating(data.getCurrentRating())
-                        .maximumRating(data.getMaximumRating())
-                        .globalRank(data.getGlobalRank())
-                        .countryRank(data.getCountryRank())
-                        .problemsSolved(data.getProblemsSolved())
-                        .easySolved(data.getEasySolved())
-                        .mediumSolved(data.getMediumSolved())
-                        .hardSolved(data.getHardSolved())
-                        .contestsParticipated(data.getContestsParticipated())
-                        .additionalStats(data.getAdditionalStats())
-                        .snapshotAt(data.getFetchedAt() != null ? data.getFetchedAt() : Instant.now())
-                        .build();
-                snapshotToReturn = platformStatSnapshotRepository.save(newSnapshot);
-            }
-
-            account.setSyncStatus(SyncStatus.SUCCESS);
-            account.setLastSyncedAt(Instant.now());
-            account.setLastSyncError(null);
-            PlatformAccount savedAccount = platformAccountRepository.save(account);
-
-            return CodingProfileMapper.toResponse(savedAccount, snapshotToReturn);
-
-        } catch (Exception ex) {
-            account.setSyncStatus(SyncStatus.FAILED);
-            String sanitizedError = sanitizeErrorMessage(ex.getMessage());
-            account.setLastSyncError(sanitizedError);
-            PlatformAccount savedAccount = platformAccountRepository.save(account);
-
-            // Preserve the previous successful snapshot on failure
-            PlatformStatSnapshot latestExisting = platformStatSnapshotRepository
-                    .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId())
-                    .orElse(null);
-
-            return CodingProfileMapper.toResponse(savedAccount, latestExisting);
-        }
-    }
-
-    private boolean isSameStatistics(PlatformStatSnapshot s, ExternalProfileData d) {
-        boolean sameStatsMap = isSameMap(s.getAdditionalStats(), d.getAdditionalStats());
-        return Objects.equals(s.getCurrentRating(), d.getCurrentRating()) &&
-                Objects.equals(s.getMaximumRating(), d.getMaximumRating()) &&
-                Objects.equals(s.getGlobalRank(), d.getGlobalRank()) &&
-                Objects.equals(s.getCountryRank(), d.getCountryRank()) &&
-                Objects.equals(s.getProblemsSolved(), d.getProblemsSolved()) &&
-                Objects.equals(s.getEasySolved(), d.getEasySolved()) &&
-                Objects.equals(s.getMediumSolved(), d.getMediumSolved()) &&
-                Objects.equals(s.getHardSolved(), d.getHardSolved()) &&
-                Objects.equals(s.getContestsParticipated(), d.getContestsParticipated()) &&
-                sameStatsMap;
-    }
-
-    private boolean isSameMap(java.util.Map<String, Object> m1, java.util.Map<String, Object> m2) {
-        boolean m1Empty = (m1 == null || m1.isEmpty());
-        boolean m2Empty = (m2 == null || m2.isEmpty());
-        if (m1Empty && m2Empty) {
-            return true;
-        }
-        return Objects.equals(m1, m2);
-    }
-
-    private String sanitizeErrorMessage(String message) {
-        if (message == null || message.trim().isEmpty()) {
-            return "Unknown platform synchronization error";
-        }
-        String sanitized = message.replaceAll("(?i)(password|secret|token|key|authorization)=[^\s&]+", "$1=***");
-        if (sanitized.length() > 500) {
-            sanitized = sanitized.substring(0, 497) + "...";
-        }
-        return sanitized;
+        return platformSyncService.syncAccountForUser(accountId, currentUserId);
     }
 
     @Override
