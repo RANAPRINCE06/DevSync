@@ -2,6 +2,7 @@ package com.devsync.coding.sync.service;
 
 import com.devsync.coding.dto.PlatformAccountResponse;
 import com.devsync.coding.entity.PlatformAccount;
+import com.devsync.coding.enums.CodingPlatform;
 import com.devsync.coding.sync.dto.PlatformSyncResult;
 
 import java.util.List;
@@ -19,6 +20,15 @@ public interface PlatformSyncService {
      * @return PlatformSyncResult indicating status, snapshot outcome, and errors
      */
     PlatformSyncResult syncAccount(PlatformAccount account);
+
+    /**
+     * Synchronizes a single platform account with concurrency duplicate protection and trigger attribution.
+     *
+     * @param account the account entity to synchronize
+     * @param triggerType origin trigger ("scheduled" or "manual")
+     * @return PlatformSyncResult indicating status, snapshot outcome, and errors
+     */
+    PlatformSyncResult syncAccount(PlatformAccount account, String triggerType);
 
     /**
      * Synchronizes all active platform accounts in the system, isolating individual platform failures.
@@ -43,4 +53,9 @@ public interface PlatformSyncService {
      * @return true if currently running
      */
     boolean isAccountSyncInFlight(UUID accountId);
+
+    /**
+     * Evicts cached external profile data for the specified platform account.
+     */
+    void evictAccountCache(CodingPlatform platform, String username);
 }

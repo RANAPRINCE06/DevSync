@@ -75,3 +75,35 @@ app:
       fixed-delay-ms: ${CODING_SYNC_FIXED_DELAY_MS:21600000}
       initial-delay-ms: ${CODING_SYNC_INITIAL_DELAY_MS:60000}
       max-concurrent-workers: 4
+    reliability:
+      rate-limit:
+        enabled: ${CODING_RATELIMIT_ENABLED:true}
+        platforms:
+          CODEFORCES:
+            capacity: 5
+            refill-rate-per-second: 2.0
+          GITHUB:
+            capacity: 10
+            refill-rate-per-second: 0.5
+          LEETCODE:
+            capacity: 5
+            refill-rate-per-second: 0.2
+          HACKERRANK:
+            capacity: 5
+            refill-rate-per-second: 0.5
+          ATCODER:
+            capacity: 5
+            refill-rate-per-second: 0.5
+          CODECHEF:
+            capacity: 1
+            refill-rate-per-second: 0.1
+      cache:
+        enabled: ${CODING_CACHE_ENABLED:true}
+        ttl-seconds: ${CODING_CACHE_TTL_SECONDS:900}
+        max-entries: 1000
+      retry:
+        enabled: ${CODING_RETRY_ENABLED:true}
+        max-attempts: 3
+        initial-backoff-ms: 500
+        max-backoff-ms: 5000
+        jitter-factor: 0.2

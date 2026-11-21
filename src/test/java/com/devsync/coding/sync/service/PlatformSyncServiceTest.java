@@ -4,6 +4,7 @@ import com.devsync.coding.dto.PlatformAccountResponse;
 import com.devsync.coding.entity.PlatformAccount;
 import com.devsync.coding.enums.CodingPlatform;
 import com.devsync.coding.enums.SyncStatus;
+import com.devsync.coding.reliability.cache.PlatformProfileCache;
 import com.devsync.coding.repository.PlatformAccountRepository;
 import com.devsync.coding.repository.PlatformStatSnapshotRepository;
 import com.devsync.coding.sync.dto.PlatformSyncResult;
@@ -38,6 +39,9 @@ class PlatformSyncServiceTest {
 
     @Mock
     private PlatformStatSnapshotRepository platformStatSnapshotRepository;
+
+    @Mock
+    private PlatformProfileCache platformProfileCache;
 
     @InjectMocks
     private PlatformSyncServiceImpl platformSyncService;

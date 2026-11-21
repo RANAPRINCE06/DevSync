@@ -58,11 +58,13 @@ public class DefaultCodingPlatformClient implements CodingPlatformClient {
                         if (code == 404) {
                             throw new PlatformUserNotFoundException("Profile not found at external URL: " + url);
                         } else if (code == 429) {
-                            throw new PlatformRateLimitException("External platform rate limit reached (HTTP 429) for URL: " + url);
+                            Long retryAfter = parseRetryAfter(resp.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
+                            throw new PlatformRateLimitException("External platform rate limit reached (HTTP 429) for URL: " + url, retryAfter);
                         } else if (code == 403) {
                             String remaining = resp.getHeaders().getFirst("X-RateLimit-Remaining");
                             if ("0".equals(remaining)) {
-                                throw new PlatformRateLimitException("GitHub API rate limit exhausted (HTTP 403, X-RateLimit-Remaining: 0)");
+                                Long retryAfter = parseEpochReset(resp.getHeaders().getFirst("X-RateLimit-Reset"));
+                                throw new PlatformRateLimitException("GitHub API rate limit exhausted (HTTP 403, X-RateLimit-Remaining: 0)", retryAfter);
                             }
                             throw new PlatformIntegrationException("External platform access forbidden (HTTP 403)");
                         }
@@ -102,7 +104,8 @@ public class DefaultCodingPlatformClient implements CodingPlatformClient {
                         if (code == 404) {
                             throw new PlatformUserNotFoundException("Profile not found at external URL: " + url);
                         } else if (code == 429) {
-                            throw new PlatformRateLimitException("External platform rate limit reached (HTTP 429)");
+                            Long retryAfter = parseRetryAfter(resp.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
+                            throw new PlatformRateLimitException("External platform rate limit reached (HTTP 429)", retryAfter);
                         }
                         throw new PlatformIntegrationException("External platform client error: HTTP " + code);
                     })
@@ -118,6 +121,30 @@ public class DefaultCodingPlatformClient implements CodingPlatformClient {
         } catch (Exception ex) {
             log.error("Unexpected error posting to external platform: {}", ex.getMessage());
             throw new PlatformIntegrationException("Failed to query external platform: " + ex.getMessage(), ex);
+        }
+    }
+
+    private Long parseRetryAfter(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(headerValue.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long parseEpochReset(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return null;
+        }
+        try {
+            long resetEpoch = Long.parseLong(headerValue.trim());
+            long nowEpoch = java.time.Instant.now().getEpochSecond();
+            return Math.max(1L, resetEpoch - nowEpoch);
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 }

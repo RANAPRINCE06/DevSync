@@ -121,6 +121,7 @@ public class CodingProfileServiceImpl implements CodingProfileService {
 
         account.setActive(false);
         platformAccountRepository.save(account);
+        platformSyncService.evictAccountCache(account.getPlatform(), account.getUsername());
     }
 
     @Override

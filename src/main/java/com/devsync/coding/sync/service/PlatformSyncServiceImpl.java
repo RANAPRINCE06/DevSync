@@ -3,14 +3,17 @@ package com.devsync.coding.sync.service;
 import com.devsync.coding.dto.PlatformAccountResponse;
 import com.devsync.coding.entity.PlatformAccount;
 import com.devsync.coding.entity.PlatformStatSnapshot;
+import com.devsync.coding.enums.CodingPlatform;
 import com.devsync.coding.enums.SyncStatus;
 import com.devsync.coding.mapper.CodingProfileMapper;
+import com.devsync.coding.reliability.cache.PlatformProfileCache;
 import com.devsync.coding.repository.PlatformAccountRepository;
 import com.devsync.coding.repository.PlatformStatSnapshotRepository;
 import com.devsync.coding.sync.dto.PlatformSyncResult;
 import com.devsync.common.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,18 +36,27 @@ public class PlatformSyncServiceImpl implements PlatformSyncService {
     private final PlatformSyncWorker platformSyncWorker;
     private final PlatformAccountRepository platformAccountRepository;
     private final PlatformStatSnapshotRepository platformStatSnapshotRepository;
+    private final PlatformProfileCache platformProfileCache;
     private final Set<UUID> inFlightAccountIds = ConcurrentHashMap.newKeySet();
 
+    @Autowired
     public PlatformSyncServiceImpl(PlatformSyncWorker platformSyncWorker,
                                    PlatformAccountRepository platformAccountRepository,
-                                   PlatformStatSnapshotRepository platformStatSnapshotRepository) {
+                                   PlatformStatSnapshotRepository platformStatSnapshotRepository,
+                                   PlatformProfileCache platformProfileCache) {
         this.platformSyncWorker = platformSyncWorker;
         this.platformAccountRepository = platformAccountRepository;
         this.platformStatSnapshotRepository = platformStatSnapshotRepository;
+        this.platformProfileCache = platformProfileCache;
     }
 
     @Override
     public PlatformSyncResult syncAccount(PlatformAccount account) {
+        return syncAccount(account, null);
+    }
+
+    @Override
+    public PlatformSyncResult syncAccount(PlatformAccount account, String triggerType) {
         if (account == null || account.getId() == null) {
             throw new IllegalArgumentException("Platform account must not be null");
         }
@@ -80,6 +92,9 @@ public class PlatformSyncServiceImpl implements PlatformSyncService {
         }
 
         try {
+            if (triggerType != null) {
+                return platformSyncWorker.executeSync(account, triggerType);
+            }
             return platformSyncWorker.executeSync(account);
         } finally {
             inFlightAccountIds.remove(account.getId());
@@ -126,6 +141,9 @@ public class PlatformSyncServiceImpl implements PlatformSyncService {
         PlatformAccount account = platformAccountRepository.findByIdAndUserIdAndActiveTrue(accountId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Platform account not found: " + accountId));
 
+        // Invalidate profile cache on manual user sync to guarantee fresh external data
+        evictAccountCache(account.getPlatform(), account.getUsername());
+
         syncAccount(account);
 
         PlatformAccount refreshed = platformAccountRepository.findById(accountId)
@@ -140,5 +158,12 @@ public class PlatformSyncServiceImpl implements PlatformSyncService {
     @Override
     public boolean isAccountSyncInFlight(UUID accountId) {
         return accountId != null && inFlightAccountIds.contains(accountId);
+    }
+
+    @Override
+    public void evictAccountCache(CodingPlatform platform, String username) {
+        if (platformProfileCache != null && platform != null && username != null) {
+            platformProfileCache.evict(platform, username);
+        }
     }
 }

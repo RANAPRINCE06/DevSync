@@ -8,6 +8,10 @@ import com.devsync.coding.integration.CodingPlatformAdapter;
 import com.devsync.coding.integration.dto.ExternalProfileData;
 import com.devsync.coding.integration.exception.PlatformIntegrationException;
 import com.devsync.coding.integration.registry.PlatformIntegrationRegistry;
+import com.devsync.coding.reliability.cache.PlatformProfileCache;
+import com.devsync.coding.reliability.metrics.CodingSyncMetrics;
+import com.devsync.coding.reliability.ratelimit.PlatformRateLimitManager;
+import com.devsync.coding.reliability.retry.PlatformSyncRetryExecutor;
 import com.devsync.coding.repository.PlatformAccountRepository;
 import com.devsync.coding.repository.PlatformStatSnapshotRepository;
 import com.devsync.coding.sync.dto.PlatformSyncResult;
@@ -25,6 +29,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +51,18 @@ class PlatformSyncWorkerTest {
     @Mock
     private CodingPlatformAdapter adapter;
 
+    @Mock
+    private PlatformRateLimitManager platformRateLimitManager;
+
+    @Mock
+    private PlatformProfileCache platformProfileCache;
+
+    @Mock
+    private PlatformSyncRetryExecutor platformSyncRetryExecutor;
+
+    @Mock
+    private CodingSyncMetrics codingSyncMetrics;
+
     @InjectMocks
     private PlatformSyncWorker worker;
 
@@ -53,7 +70,7 @@ class PlatformSyncWorkerTest {
     private PlatformAccount account;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         user = new User();
         user.setId(UUID.randomUUID());
 
@@ -66,6 +83,11 @@ class PlatformSyncWorkerTest {
                 .active(true)
                 .syncStatus(SyncStatus.NEVER_SYNCED)
                 .build();
+
+        lenient().when(platformRateLimitManager.tryAcquire(any())).thenReturn(true);
+        lenient().when(platformProfileCache.isEnabled()).thenReturn(false);
+        lenient().when(platformSyncRetryExecutor.executeWithRetry(any(), any(), any()))
+                .thenAnswer(inv -> ((java.util.concurrent.Callable<?>) inv.getArgument(2)).call());
     }
 
     @Test
@@ -192,5 +214,45 @@ class PlatformSyncWorkerTest {
         assertEquals(SyncStatus.FAILED, result.getStatus());
         assertNotNull(result.getErrorMessage());
         assertEquals(SyncStatus.FAILED, account.getSyncStatus());
+    }
+
+    @Test
+    @DisplayName("executeSync — Cache hit returns cached data without calling adapter")
+    void executeSync_CacheHit_UsesCachedData() {
+        when(platformIntegrationRegistry.getRequiredAdapter(CodingPlatform.LEETCODE)).thenReturn(adapter);
+        when(platformProfileCache.isEnabled()).thenReturn(true);
+
+        ExternalProfileData cachedData = ExternalProfileData.builder()
+                .platform(CodingPlatform.LEETCODE)
+                .username("test_lc")
+                .problemsSolved(300)
+                .fetchedAt(Instant.now().minusSeconds(60))
+                .build();
+        when(platformProfileCache.get(CodingPlatform.LEETCODE, "test_lc")).thenReturn(cachedData);
+        when(platformStatSnapshotRepository.findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId()))
+                .thenReturn(Optional.empty());
+
+        PlatformSyncResult result = worker.executeSync(account);
+
+        assertEquals(SyncStatus.SUCCESS, result.getStatus());
+        assertTrue(result.isSnapshotCreated());
+        verify(adapter, never()).fetchProfileData(anyString());
+        verify(platformRateLimitManager, never()).tryAcquire(any());
+    }
+
+    @Test
+    @DisplayName("executeSync — Rate limited request fails fast and sets FAILED status")
+    void executeSync_RateLimited_FailsFast() {
+        when(platformIntegrationRegistry.getRequiredAdapter(CodingPlatform.LEETCODE)).thenReturn(adapter);
+        when(platformRateLimitManager.tryAcquire(CodingPlatform.LEETCODE)).thenReturn(false);
+        when(platformRateLimitManager.getEstimatedWaitTimeSeconds(CodingPlatform.LEETCODE)).thenReturn(15L);
+
+        PlatformSyncResult result = worker.executeSync(account);
+
+        assertEquals(SyncStatus.FAILED, result.getStatus());
+        assertTrue(result.getErrorMessage().contains("Rate limit"));
+        assertEquals(SyncStatus.FAILED, account.getSyncStatus());
+        assertTrue(account.getLastSyncError().contains("Rate limit"));
+        verify(adapter, never()).fetchProfileData(anyString());
     }
 }

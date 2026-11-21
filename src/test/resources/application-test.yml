@@ -45,3 +45,35 @@ app:
       fixed-delay-ms: 60000
       initial-delay-ms: 10000
       max-concurrent-workers: 2
+    reliability:
+      rate-limit:
+        enabled: true
+        platforms:
+          CODEFORCES:
+            capacity: 50
+            refill-rate-per-second: 50.0
+          GITHUB:
+            capacity: 50
+            refill-rate-per-second: 50.0
+          LEETCODE:
+            capacity: 50
+            refill-rate-per-second: 50.0
+          CODECHEF:
+            capacity: 50
+            refill-rate-per-second: 50.0
+          HACKERRANK:
+            capacity: 50
+            refill-rate-per-second: 50.0
+          ATCODER:
+            capacity: 50
+            refill-rate-per-second: 50.0
+      cache:
+        enabled: true
+        ttl-seconds: 60
+        max-entries: 100
+      retry:
+        enabled: true
+        max-attempts: 3
+        initial-backoff-ms: 10
+        max-backoff-ms: 50
+        jitter-factor: 0.0

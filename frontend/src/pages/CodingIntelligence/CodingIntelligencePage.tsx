@@ -296,7 +296,7 @@ export const CodingIntelligencePage: React.FC = () => {
             <Globe className="w-5 h-5 text-primary-500" />
             Supported Platforms ({accounts.length} / 6 connected)
           </h2>
-          <span className="text-xs text-surface-500">Step 5A Foundation Mode</span>
+          <span className="text-xs text-surface-500">Step 5D Reliability Engine</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -393,9 +393,18 @@ export const CodingIntelligencePage: React.FC = () => {
                       </div>
 
                       {account.syncStatus === 'FAILED' && account.lastSyncError && (
-                        <div className="p-2 mt-2 rounded bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
+                        <div className={`p-2 mt-2 rounded border flex items-start gap-1.5 text-[11px] ${
+                          account.lastSyncError.toLowerCase().includes('rate limit') || account.lastSyncError.includes('429')
+                            ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400'
+                            : 'bg-red-50/80 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400'
+                        }`}>
                           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          <span className="break-all">{account.lastSyncError}</span>
+                          <div className="flex flex-col">
+                            {account.lastSyncError.toLowerCase().includes('rate limit') && (
+                              <span className="font-semibold uppercase tracking-wider text-[10px]">Rate Limited</span>
+                            )}
+                            <span className="break-all">{account.lastSyncError}</span>
+                          </div>
                         </div>
                       )}
 

@@ -63,6 +63,9 @@ class CodingAccountSyncIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired(required = false)
+    private com.devsync.coding.reliability.cache.PlatformProfileCache platformProfileCache;
+
     @MockBean
     private PlatformIntegrationRegistry platformIntegrationRegistry;
 
@@ -73,6 +76,9 @@ class CodingAccountSyncIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        if (platformProfileCache != null) {
+            platformProfileCache.clear();
+        }
         platformStatSnapshotRepository.deleteAll();
         platformAccountRepository.deleteAll();
         userRepository.deleteAll();
