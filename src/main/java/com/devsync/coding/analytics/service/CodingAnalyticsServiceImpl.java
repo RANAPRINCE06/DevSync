@@ -62,9 +62,25 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
         int totalContests = 0;
         Double highestRating = null;
         CodingPlatform highestRatingPlatform = null;
+        Integer totalGitHubRepos = null;
+        Integer totalGitHubStars = null;
+        int activeSyncPlatformsCount = 0;
+        Instant latestSuccessfulSyncAt = null;
+        boolean hasFailedSync = false;
         List<CodingAnalyticsOverviewResponse.PlatformOverviewItem> items = new ArrayList<>();
 
         for (PlatformAccount account : activeAccounts) {
+            if (account.getPlatform().isAutomatedSyncSupported()) {
+                activeSyncPlatformsCount++;
+            }
+            if (account.getSyncStatus() == com.devsync.coding.enums.SyncStatus.SUCCESS && account.getLastSyncedAt() != null) {
+                if (latestSuccessfulSyncAt == null || account.getLastSyncedAt().isAfter(latestSuccessfulSyncAt)) {
+                    latestSuccessfulSyncAt = account.getLastSyncedAt();
+                }
+            } else if (account.getSyncStatus() == com.devsync.coding.enums.SyncStatus.FAILED) {
+                hasFailedSync = true;
+            }
+
             Optional<PlatformStatSnapshot> latestOpt = platformStatSnapshotRepository
                     .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
 
@@ -72,6 +88,7 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
             Double rating = null;
             Long rank = null;
             Integer contests = null;
+            Map<String, Object> additionalStats = null;
 
             if (latestOpt.isPresent()) {
                 PlatformStatSnapshot latest = latestOpt.get();
@@ -87,6 +104,18 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
 
                 rating = latest.getCurrentRating() != null ? latest.getCurrentRating() : latest.getMaximumRating();
                 rank = latest.getGlobalRank();
+                additionalStats = latest.getAdditionalStats();
+
+                if (account.getPlatform() == CodingPlatform.GITHUB && additionalStats != null) {
+                    Object repos = additionalStats.get("publicRepos");
+                    if (repos instanceof Number n) {
+                        totalGitHubRepos = (totalGitHubRepos == null ? 0 : totalGitHubRepos) + n.intValue();
+                    }
+                    Object stars = additionalStats.get("totalStars");
+                    if (stars instanceof Number n) {
+                        totalGitHubStars = (totalGitHubStars == null ? 0 : totalGitHubStars) + n.intValue();
+                    }
+                }
 
                 if (rating != null && (highestRating == null || rating > highestRating)) {
                     highestRating = rating;
@@ -101,9 +130,15 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
                     rating,
                     rank,
                     contests,
-                    account.getLastSyncedAt()
+                    account.getLastSyncedAt(),
+                    account.getSyncStatus(),
+                    account.isActive(),
+                    account.getPlatform().isAutomatedSyncSupported(),
+                    additionalStats
             ));
         }
+
+        String syncHealthStatus = hasFailedSync ? "ATTENTION_NEEDED" : (activeSyncPlatformsCount > 0 ? "HEALTHY" : "NORMAL");
 
         return new CodingAnalyticsOverviewResponse(
                 totalSolved,
@@ -114,7 +149,12 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
                 totalSnapshots,
                 firstSnapshotAt,
                 lastSnapshotAt,
-                items
+                items,
+                totalGitHubRepos,
+                totalGitHubStars,
+                activeSyncPlatformsCount,
+                latestSuccessfulSyncAt,
+                syncHealthStatus
         );
     }
 
@@ -462,6 +502,21 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
         int accountsWithSnapshots = 0;
 
         for (PlatformAccount account : accounts) {
+            // Step 6B: Sync failure alert insight evaluated regardless of snapshot presence
+            if (account.getSyncStatus() == com.devsync.coding.enums.SyncStatus.FAILED) {
+                String error = account.getLastSyncError() != null ? account.getLastSyncError() : "Service unavailable";
+                items.add(new PerformanceInsightsResponse.PerformanceInsightItem(
+                        UUID.randomUUID().toString(),
+                        account.getPlatform(),
+                        "SYNC_ALERT",
+                        "ATTENTION",
+                        "Sync Attention Needed",
+                        String.format("Last sync for %s failed (%s). Trigger manual sync or await background cycle.",
+                                account.getPlatform(), error),
+                        "Sync Issue"
+                ));
+            }
+
             List<PlatformStatSnapshot> snapshots = platformStatSnapshotRepository
                     .findByAccountIdAndDateRangeAsc(account.getId(), range.from(), range.to());
 
@@ -572,7 +627,40 @@ public class CodingAnalyticsServiceImpl implements CodingAnalyticsService {
                         ));
                     }
                 }
+
+                // Platform-specific metrics in additionalStats
+                if (last.getAdditionalStats() != null) {
+                    if (account.getPlatform() == CodingPlatform.ATCODER) {
+                        Object acRank = last.getAdditionalStats().get("communityAcRank");
+                        if (acRank instanceof Number n) {
+                            items.add(new PerformanceInsightsResponse.PerformanceInsightItem(
+                                    UUID.randomUUID().toString(),
+                                    account.getPlatform(),
+                                    "COMMUNITY_RANK",
+                                    "INFORMATIONAL",
+                                    "AtCoder Community Rank",
+                                    String.format("Ranked #%d globally on the AtCoder Problems AC leaderboard.", n.longValue()),
+                                    "#" + n
+                            ));
+                        }
+                    } else if (account.getPlatform() == CodingPlatform.GITHUB) {
+                        Object stars = last.getAdditionalStats().get("totalStars");
+                        if (stars instanceof Number n && n.intValue() > 0) {
+                            items.add(new PerformanceInsightsResponse.PerformanceInsightItem(
+                                    UUID.randomUUID().toString(),
+                                    account.getPlatform(),
+                                    "GITHUB_STARS",
+                                    "POSITIVE",
+                                    "Repository Recognition",
+                                    String.format("Your public repositories have accumulated %d total GitHub stars.", n.intValue()),
+                                    "★ " + n
+                            ));
+                        }
+                    }
+                }
             }
+
+
         }
 
         if (platform == null && solvedDeltaTotal > 0) {

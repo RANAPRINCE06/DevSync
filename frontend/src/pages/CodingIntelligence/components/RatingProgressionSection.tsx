@@ -25,16 +25,19 @@ export const RatingProgressionSection: React.FC<RatingProgressionSectionProps> =
     );
   }
 
-  const platforms = ratingData?.platforms || [];
+  // Filter out any unrated platform or AtCoder (AtCoder community API does not provide contest rating)
+  const platforms = (ratingData?.platforms || []).filter(
+    (p) => (p.platform === 'LEETCODE' || p.platform === 'CODEFORCES') && p.dataAvailable
+  );
   const activeSeries = platforms[selectedPlatformIndex] || platforms[0];
 
   if (!platforms.length || !activeSeries) {
     return (
       <div className="p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm text-center py-12">
         <ChartIcon className="w-10 h-10 text-surface-400 mx-auto mb-2 opacity-50" />
-        <h4 className="text-sm font-semibold text-surface-900 dark:text-surface-100">No Rating History Available</h4>
+        <h4 className="text-sm font-semibold text-surface-900 dark:text-surface-100">No Rated Platform History Available</h4>
         <p className="text-xs text-surface-500 mt-1 max-w-sm mx-auto">
-          Connect rated competitive platforms (Codeforces, LeetCode, CodeChef, or AtCoder) to track contest rating progressions over time.
+          Connect rated competitive platforms (Codeforces or LeetCode) to track official contest rating progressions over time.
         </p>
       </div>
     );

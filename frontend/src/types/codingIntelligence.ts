@@ -135,6 +135,10 @@ export interface PlatformOverviewItem {
   globalRank: number | null;
   contestsParticipated: number | null;
   lastSyncedAt: string | null;
+  syncStatus?: SyncStatus;
+  active?: boolean;
+  autoSyncSupported?: boolean;
+  additionalStats?: Record<string, unknown> | null;
 }
 
 export interface CodingAnalyticsOverview {
@@ -147,6 +151,11 @@ export interface CodingAnalyticsOverview {
   firstSnapshotAt: string | null;
   lastSnapshotAt: string | null;
   platformOverviews: PlatformOverviewItem[];
+  totalGitHubRepositories?: number | null;
+  totalGitHubStars?: number | null;
+  activeSyncPlatformsCount?: number;
+  latestSuccessfulSyncAt?: string | null;
+  syncHealthStatus?: 'HEALTHY' | 'ATTENTION_NEEDED' | 'NORMAL';
 }
 
 export interface RatingPoint {

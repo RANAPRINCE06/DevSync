@@ -147,7 +147,72 @@ class CodingAnalyticsIntegrationTest {
                 .andExpect(jsonPath("$.data.highestRating", is(1820.0)))
                 .andExpect(jsonPath("$.data.highestRatingPlatform", is("LEETCODE")))
                 .andExpect(jsonPath("$.data.totalContestsParticipated", is(25))) // 10 + 15
+                .andExpect(jsonPath("$.data.activeSyncPlatformsCount", is(2)))
+                .andExpect(jsonPath("$.data.syncHealthStatus", is("HEALTHY")))
                 .andExpect(jsonPath("$.data.platformOverviews", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("GET /overview — GitHub repos/stars and AtCoder community metrics are properly aggregated")
+    void getOverview_WithGitHubAndAtCoder_AggregatesCorrectly() throws Exception {
+        PlatformAccount gh = platformAccountRepository.save(PlatformAccount.builder()
+                .user(alice)
+                .platform(CodingPlatform.GITHUB)
+                .username("alice_gh")
+                .profileUrl("https://github.com/alice_gh")
+                .active(true)
+                .syncStatus(SyncStatus.SUCCESS)
+                .build());
+
+        platformStatSnapshotRepository.save(PlatformStatSnapshot.builder()
+                .platformAccount(gh)
+                .snapshotAt(Instant.now())
+                .additionalStats(Map.of("publicRepos", 24, "totalStars", 145))
+                .build());
+
+        PlatformAccount atcoder = platformAccountRepository.save(PlatformAccount.builder()
+                .user(alice)
+                .platform(CodingPlatform.ATCODER)
+                .username("alice_at")
+                .profileUrl("https://atcoder.jp/users/alice_at")
+                .active(true)
+                .syncStatus(SyncStatus.SUCCESS)
+                .build());
+
+        platformStatSnapshotRepository.save(PlatformStatSnapshot.builder()
+                .platformAccount(atcoder)
+                .problemsSolved(95)
+                .snapshotAt(Instant.now())
+                .additionalStats(Map.of("communityAcRank", 3200, "ratedPointSum", 45000))
+                .build());
+
+        mockMvc.perform(get("/api/v1/coding/analytics/overview")
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalGitHubRepositories", is(24)))
+                .andExpect(jsonPath("$.data.totalGitHubStars", is(145)))
+                .andExpect(jsonPath("$.data.activeSyncPlatformsCount", is(4))) // LC, CF, GH, ATCODER
+                .andExpect(jsonPath("$.data.totalProblemsSolved", is(715))); // 620 + 95
+    }
+
+    @Test
+    @DisplayName("GET /insights — Failed sync accounts trigger sync attention alerts")
+    void getInsights_WithFailedSync_GeneratesAlert() throws Exception {
+        PlatformAccount failing = platformAccountRepository.save(PlatformAccount.builder()
+                .user(alice)
+                .platform(CodingPlatform.LEETCODE)
+                .username("alice_fail")
+                .profileUrl("https://leetcode.com/u/alice_fail")
+                .active(true)
+                .syncStatus(SyncStatus.FAILED)
+                .lastSyncError("External platform rate limit reached (HTTP 429)")
+                .build());
+
+        mockMvc.perform(get("/api/v1/coding/analytics/insights?period=30d")
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.insights[?(@.category == 'SYNC_ALERT')]", not(empty())))
+                .andExpect(jsonPath("$.data.insights[?(@.type == 'ATTENTION')]", not(empty())));
     }
 
     @Test

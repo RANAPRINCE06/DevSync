@@ -1,9 +1,11 @@
 package com.devsync.coding.analytics.dto;
 
 import com.devsync.coding.enums.CodingPlatform;
+import com.devsync.coding.enums.SyncStatus;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public class CodingAnalyticsOverviewResponse {
 
@@ -17,6 +19,13 @@ public class CodingAnalyticsOverviewResponse {
     private Instant lastSnapshotAt;
     private List<PlatformOverviewItem> platformOverviews;
 
+    // Step 6B additions
+    private Integer totalGitHubRepositories;
+    private Integer totalGitHubStars;
+    private int activeSyncPlatformsCount;
+    private Instant latestSuccessfulSyncAt;
+    private String syncHealthStatus;
+
     public CodingAnalyticsOverviewResponse() {
     }
 
@@ -25,6 +34,19 @@ public class CodingAnalyticsOverviewResponse {
                                           Integer totalContestsParticipated, long totalSnapshotsCollected,
                                           Instant firstSnapshotAt, Instant lastSnapshotAt,
                                           List<PlatformOverviewItem> platformOverviews) {
+        this(totalProblemsSolved, connectedPlatformsCount, highestRating, highestRatingPlatform,
+                totalContestsParticipated, totalSnapshotsCollected, firstSnapshotAt, lastSnapshotAt,
+                platformOverviews, null, null, 0, null, "HEALTHY");
+    }
+
+    public CodingAnalyticsOverviewResponse(Integer totalProblemsSolved, int connectedPlatformsCount,
+                                          Double highestRating, CodingPlatform highestRatingPlatform,
+                                          Integer totalContestsParticipated, long totalSnapshotsCollected,
+                                          Instant firstSnapshotAt, Instant lastSnapshotAt,
+                                          List<PlatformOverviewItem> platformOverviews,
+                                          Integer totalGitHubRepositories, Integer totalGitHubStars,
+                                          int activeSyncPlatformsCount, Instant latestSuccessfulSyncAt,
+                                          String syncHealthStatus) {
         this.totalProblemsSolved = totalProblemsSolved;
         this.connectedPlatformsCount = connectedPlatformsCount;
         this.highestRating = highestRating;
@@ -34,6 +56,11 @@ public class CodingAnalyticsOverviewResponse {
         this.firstSnapshotAt = firstSnapshotAt;
         this.lastSnapshotAt = lastSnapshotAt;
         this.platformOverviews = platformOverviews;
+        this.totalGitHubRepositories = totalGitHubRepositories;
+        this.totalGitHubStars = totalGitHubStars;
+        this.activeSyncPlatformsCount = activeSyncPlatformsCount;
+        this.latestSuccessfulSyncAt = latestSuccessfulSyncAt;
+        this.syncHealthStatus = syncHealthStatus;
     }
 
     public Integer getTotalProblemsSolved() {
@@ -108,6 +135,46 @@ public class CodingAnalyticsOverviewResponse {
         this.platformOverviews = platformOverviews;
     }
 
+    public Integer getTotalGitHubRepositories() {
+        return totalGitHubRepositories;
+    }
+
+    public void setTotalGitHubRepositories(Integer totalGitHubRepositories) {
+        this.totalGitHubRepositories = totalGitHubRepositories;
+    }
+
+    public Integer getTotalGitHubStars() {
+        return totalGitHubStars;
+    }
+
+    public void setTotalGitHubStars(Integer totalGitHubStars) {
+        this.totalGitHubStars = totalGitHubStars;
+    }
+
+    public int getActiveSyncPlatformsCount() {
+        return activeSyncPlatformsCount;
+    }
+
+    public void setActiveSyncPlatformsCount(int activeSyncPlatformsCount) {
+        this.activeSyncPlatformsCount = activeSyncPlatformsCount;
+    }
+
+    public Instant getLatestSuccessfulSyncAt() {
+        return latestSuccessfulSyncAt;
+    }
+
+    public void setLatestSuccessfulSyncAt(Instant latestSuccessfulSyncAt) {
+        this.latestSuccessfulSyncAt = latestSuccessfulSyncAt;
+    }
+
+    public String getSyncHealthStatus() {
+        return syncHealthStatus;
+    }
+
+    public void setSyncHealthStatus(String syncHealthStatus) {
+        this.syncHealthStatus = syncHealthStatus;
+    }
+
     public static class PlatformOverviewItem {
         private CodingPlatform platform;
         private String username;
@@ -116,6 +183,10 @@ public class CodingAnalyticsOverviewResponse {
         private Long globalRank;
         private Integer contestsParticipated;
         private Instant lastSyncedAt;
+        private SyncStatus syncStatus;
+        private boolean active;
+        private boolean autoSyncSupported;
+        private Map<String, Object> additionalStats;
 
         public PlatformOverviewItem() {
         }
@@ -123,6 +194,14 @@ public class CodingAnalyticsOverviewResponse {
         public PlatformOverviewItem(CodingPlatform platform, String username, Integer problemsSolved,
                                     Double currentRating, Long globalRank, Integer contestsParticipated,
                                     Instant lastSyncedAt) {
+            this(platform, username, problemsSolved, currentRating, globalRank, contestsParticipated,
+                    lastSyncedAt, SyncStatus.NEVER_SYNCED, true, platform != null && platform.isAutomatedSyncSupported(), null);
+        }
+
+        public PlatformOverviewItem(CodingPlatform platform, String username, Integer problemsSolved,
+                                    Double currentRating, Long globalRank, Integer contestsParticipated,
+                                    Instant lastSyncedAt, SyncStatus syncStatus, boolean active,
+                                    boolean autoSyncSupported, Map<String, Object> additionalStats) {
             this.platform = platform;
             this.username = username;
             this.problemsSolved = problemsSolved;
@@ -130,6 +209,10 @@ public class CodingAnalyticsOverviewResponse {
             this.globalRank = globalRank;
             this.contestsParticipated = contestsParticipated;
             this.lastSyncedAt = lastSyncedAt;
+            this.syncStatus = syncStatus;
+            this.active = active;
+            this.autoSyncSupported = autoSyncSupported;
+            this.additionalStats = additionalStats;
         }
 
         public CodingPlatform getPlatform() {
@@ -186,6 +269,38 @@ public class CodingAnalyticsOverviewResponse {
 
         public void setLastSyncedAt(Instant lastSyncedAt) {
             this.lastSyncedAt = lastSyncedAt;
+        }
+
+        public SyncStatus getSyncStatus() {
+            return syncStatus;
+        }
+
+        public void setSyncStatus(SyncStatus syncStatus) {
+            this.syncStatus = syncStatus;
+        }
+
+        public boolean isActive() {
+            return active;
+        }
+
+        public void setActive(boolean active) {
+            this.active = active;
+        }
+
+        public boolean isAutoSyncSupported() {
+            return autoSyncSupported;
+        }
+
+        public void setAutoSyncSupported(boolean autoSyncSupported) {
+            this.autoSyncSupported = autoSyncSupported;
+        }
+
+        public Map<String, Object> getAdditionalStats() {
+            return additionalStats;
+        }
+
+        public void setAdditionalStats(Map<String, Object> additionalStats) {
+            this.additionalStats = additionalStats;
         }
     }
 }

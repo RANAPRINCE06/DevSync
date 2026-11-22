@@ -20,6 +20,7 @@ export const CODING_INTELLIGENCE_KEYS = {
     [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'contest-performance', params] as const,
   performanceInsights: (params?: import('@/types/codingIntelligence').AnalyticsQueryParams) =>
     [...CODING_INTELLIGENCE_KEYS.all, 'analytics', 'insights', params] as const,
+  platforms: () => [...CODING_INTELLIGENCE_KEYS.all, 'platforms'] as const,
 };
 
 export const useConnectedAccounts = () => {
@@ -142,5 +143,13 @@ export const usePerformanceInsights = (params?: import('@/types/codingIntelligen
   return useQuery({
     queryKey: CODING_INTELLIGENCE_KEYS.performanceInsights(params),
     queryFn: () => codingIntelligenceService.getPerformanceInsights(params),
+  });
+};
+
+export const useSupportedPlatforms = () => {
+  return useQuery({
+    queryKey: CODING_INTELLIGENCE_KEYS.platforms(),
+    queryFn: () => codingIntelligenceService.getSupportedPlatforms(),
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 };

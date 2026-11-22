@@ -31,7 +31,8 @@ public class JsonMapConverter implements AttributeConverter<Map<String, Object>,
             return Collections.emptyMap();
         }
         try {
-            return OBJECT_MAPPER.readValue(dbData, new TypeReference<Map<String, Object>>() {});
+            return OBJECT_MAPPER.readValue(dbData, new TypeReference<Map<String, Object>>() {
+            });
         } catch (Exception e) {
             return Collections.emptyMap();
         }

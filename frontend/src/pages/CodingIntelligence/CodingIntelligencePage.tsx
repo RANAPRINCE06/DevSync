@@ -1,26 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import {
   Code2,
-  ExternalLink,
-  Plus,
-  Trash2,
   RefreshCw,
-  Trophy,
-  CheckCircle2,
-  AlertCircle,
-  Flame,
-  Globe,
-  Award,
-  BookOpen,
+  BarChart3,
+  Columns,
+  Activity,
+  Layers,
 } from 'lucide-react';
 import {
   CodingPlatform,
   PlatformConfig,
-  PlatformAccount,
 } from '@/types/codingIntelligence';
 import {
   useConnectedAccounts,
-  useCodingStatistics,
+  useCodingAnalyticsOverview,
   useConnectPlatform,
   useDisconnectPlatform,
   useSyncPlatform,
@@ -31,13 +24,20 @@ import {
   useContestPerformance,
   usePerformanceInsights,
 } from '@/hooks/useCodingIntelligence';
-import { HistoricalStatsChart } from './HistoricalStatsChart';
+
+import { OverviewSection } from './components/OverviewSection';
+import { PlatformCardList } from './components/PlatformCardList';
 import { AnalyticsHeader } from './components/AnalyticsHeader';
-import { PerformanceInsightsSection } from './components/PerformanceInsightsSection';
 import { RatingProgressionSection } from './components/RatingProgressionSection';
 import { ProblemDistributionSection } from './components/ProblemDistributionSection';
 import { ContestPerformanceSection } from './components/ContestPerformanceSection';
 import { CodingActivitySection } from './components/CodingActivitySection';
+import { GitHubInsightsSection } from './components/GitHubInsightsSection';
+import { PerformanceInsightsSection } from './components/PerformanceInsightsSection';
+import { PlatformComparisonSection } from './components/PlatformComparisonSection';
+import { SyncHealthCenter } from './components/SyncHealthCenter';
+import { ConnectAccountModal } from './components/ConnectAccountModal';
+import { HistoricalStatsChart } from './HistoricalStatsChart';
 
 const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
   LEETCODE: {
@@ -126,78 +126,66 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
   },
 };
 
+type DashboardTab = 'dashboard' | 'analytics' | 'comparison' | 'syncHealth';
+
 export const CodingIntelligencePage: React.FC = () => {
   const { data: accounts = [], isLoading: isLoadingAccounts, refetch } = useConnectedAccounts();
-  const { data: stats, isLoading: isLoadingStats } = useCodingStatistics();
+  const { data: overview, isLoading: isLoadingOverview } = useCodingAnalyticsOverview();
   const connectMutation = useConnectPlatform();
   const disconnectMutation = useDisconnectPlatform();
   const syncMutation = useSyncPlatform();
 
-  const [selectedPlatform, setSelectedPlatform] = useState<CodingPlatform | null>(null);
-  const [usernameInput, setUsernameInput] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
+  // Navigation tab state
+  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
+
+  // Modals and drawers
+  const [modalPlatform, setModalPlatform] = useState<CodingPlatform | null>(null);
   const [activeHistoryAccountId, setActiveHistoryAccountId] = useState<string | null>(null);
+  const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
   // Analytics Filters State
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d');
   const [analyticsPlatform, setAnalyticsPlatform] = useState<CodingPlatform | 'ALL'>('ALL');
 
-  const analyticsParams = useMemo(() => ({
-    period: analyticsPeriod,
-    platform: analyticsPlatform !== 'ALL' ? analyticsPlatform : undefined,
-  }), [analyticsPeriod, analyticsPlatform]);
+  const analyticsParams = useMemo(
+    () => ({
+      period: analyticsPeriod,
+      platform: analyticsPlatform !== 'ALL' ? analyticsPlatform : undefined,
+    }),
+    [analyticsPeriod, analyticsPlatform]
+  );
 
   const { data: insightsData, isLoading: isLoadingInsights } = usePerformanceInsights(analyticsParams);
   const { data: ratingData, isLoading: isLoadingRating } = useRatingHistory(analyticsParams);
   const { data: problemData, isLoading: isLoadingProblem } = useProblemDistribution(analyticsParams);
   const { data: activityData, isLoading: isLoadingActivity } = useCodingActivity(analyticsParams);
   const { data: contestData, isLoading: isLoadingContest } = useContestPerformance(analyticsParams);
+  const { data: snapshotHistory = [], isLoading: isLoadingHistory } = usePlatformHistory(activeHistoryAccountId);
 
   const availableConnectedPlatforms = useMemo(() => {
     return accounts.filter((a) => a.active).map((a) => a.platform);
   }, [accounts]);
 
-  const { data: snapshotHistory = [], isLoading: isLoadingHistory } = usePlatformHistory(activeHistoryAccountId);
+  const gitHubAccount = useMemo(() => {
+    return accounts.find((a) => a.platform === 'GITHUB' && a.active);
+  }, [accounts]);
 
-  // Map connected accounts by platform
-  const accountByPlatform = new Map<CodingPlatform, PlatformAccount>();
-  accounts.forEach((acc) => {
-    if (acc.active) {
-      accountByPlatform.set(acc.platform, acc);
-    }
-  });
+  const activeHistoryAccount = useMemo(() => {
+    return accounts.find((a) => a.id === activeHistoryAccountId);
+  }, [accounts, activeHistoryAccountId]);
 
+  // Actions
   const handleOpenConnect = (platform: CodingPlatform) => {
-    setSelectedPlatform(platform);
-    setUsernameInput('');
-    setValidationError(null);
+    setModalPlatform(platform);
   };
 
   const handleCloseModal = () => {
-    setSelectedPlatform(null);
-    setUsernameInput('');
-    setValidationError(null);
+    setModalPlatform(null);
   };
 
-  const handleSubmitConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPlatform) return;
-
-    const config = PLATFORM_CONFIGS[selectedPlatform];
-    const trimmed = usernameInput.trim();
-
-    if (!trimmed) {
-      setValidationError('Username is required');
-      return;
-    }
-
-    if (!config.usernameRegex.test(trimmed)) {
-      setValidationError(`Invalid username format for ${config.displayName}`);
-      return;
-    }
-
+  const handleSubmitConnect = (platform: CodingPlatform, username: string) => {
     connectMutation.mutate(
-      { platform: selectedPlatform, username: trimmed },
+      { platform, username },
       {
         onSuccess: () => {
           handleCloseModal();
@@ -207,7 +195,7 @@ export const CodingIntelligencePage: React.FC = () => {
   };
 
   const handleDisconnect = (accountId: string) => {
-    if (window.confirm('Are you sure you want to disconnect this coding platform?')) {
+    if (window.confirm('Are you sure you want to disconnect this platform account? Historical snapshots will remain preserved.')) {
       disconnectMutation.mutate(accountId, {
         onSuccess: () => {
           if (activeHistoryAccountId === accountId) {
@@ -218,7 +206,18 @@ export const CodingIntelligencePage: React.FC = () => {
     }
   };
 
-  const activeHistoryAccount = accounts.find((a) => a.id === activeHistoryAccountId);
+  const handleSync = (accountId: string) => {
+    setSyncingAccountId(accountId);
+    syncMutation.mutate(accountId, {
+      onSettled: () => {
+        setSyncingAccountId(null);
+      },
+    });
+  };
+
+  const handleToggleHistory = (accountId: string) => {
+    setActiveHistoryAccountId((prev) => (prev === accountId ? null : accountId));
+  };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -226,542 +225,219 @@ export const CodingIntelligencePage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 dark:text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-primary-950/40">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-primary-950/40">
               <Code2 className="w-5 h-5" />
             </div>
-            Coding Intelligence Dashboard
+            Coding Intelligence Experience
           </h1>
           <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-            Connect public developer profiles and track your competitive programming velocity.
+            Track multi-platform problem solving, competitive ratings, GitHub repositories, and synchronization reliability.
           </p>
         </div>
+
         <button
           onClick={() => refetch()}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300 transition-colors self-start sm:self-auto"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300 transition-colors self-start sm:self-auto"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoadingAccounts ? 'animate-spin' : ''}`} />
-          Refresh
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAccounts ? 'animate-spin' : ''}`} />
+          Refresh Data
         </button>
       </div>
 
-      {/* Aggregated Statistics Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
-          <div className="flex items-center justify-between text-surface-500 dark:text-surface-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Solved</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-surface-900 dark:text-white">
-            {isLoadingStats ? '...' : (stats?.totalProblemsSolved ?? '—')}
-          </div>
-          <p className="text-xs text-surface-500 mt-1">Combined algorithmic problems solved</p>
-        </div>
+      {/* Navigation Pills */}
+      <div className="flex items-center gap-2 border-b border-surface-200 dark:border-surface-800 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            activeTab === 'dashboard'
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Overview & Accounts
+        </button>
 
-        <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
-          <div className="flex items-center justify-between text-surface-500 dark:text-surface-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Peak Rating</span>
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
-              <Flame className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-surface-900 dark:text-white flex items-baseline gap-2">
-            {isLoadingStats ? '...' : (stats?.highestRating ? Math.round(stats.highestRating) : '—')}
-            {stats?.highestRatingPlatform && (
-              <span className="text-xs font-normal text-surface-500 uppercase">({stats.highestRatingPlatform})</span>
-            )}
-          </div>
-          <p className="text-xs text-surface-500 mt-1">Platform-specific peak (scales not cross-comparable)</p>
-        </div>
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            activeTab === 'analytics'
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          Advanced Analytics
+        </button>
 
-        <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
-          <div className="flex items-center justify-between text-surface-500 dark:text-surface-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Contests</span>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
-              <Trophy className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-surface-900 dark:text-white">
-            {isLoadingStats ? '...' : (stats?.totalContestsParticipated ?? '—')}
-          </div>
-          <p className="text-xs text-surface-500 mt-1">Live rounds and rated contests</p>
-        </div>
+        <button
+          onClick={() => setActiveTab('comparison')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            activeTab === 'comparison'
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+          }`}
+        >
+          <Columns className="w-3.5 h-3.5" />
+          Platform Comparison
+        </button>
 
-        <div className="p-5 rounded-xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm">
-          <div className="flex items-center justify-between text-surface-500 dark:text-surface-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Top Reported Rank</span>
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-surface-900 dark:text-white">
-            {isLoadingStats ? '...' : (stats?.bestRank ? `#${stats.bestRank.toLocaleString()}` : '—')}
-          </div>
-          <p className="text-xs text-surface-500 mt-1">Platform-specific leaderboard position</p>
-        </div>
+        <button
+          onClick={() => setActiveTab('syncHealth')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+            activeTab === 'syncHealth'
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          Sync Health Center
+        </button>
       </div>
 
-      {/* Advanced Analytics Control Bar */}
-      <AnalyticsHeader
-        selectedPeriod={analyticsPeriod}
-        onPeriodChange={setAnalyticsPeriod}
-        selectedPlatform={analyticsPlatform}
-        onPlatformChange={setAnalyticsPlatform}
-        availablePlatforms={availableConnectedPlatforms}
-      />
+      {/* TAB 1: OVERVIEW & PLATFORM CARDS */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Key Overview Metrics Section */}
+          <OverviewSection
+            overview={overview}
+            accounts={accounts}
+            isLoading={isLoadingOverview}
+          />
 
-      {/* Performance Insights Section */}
-      <PerformanceInsightsSection
-        insightsData={insightsData}
-        isLoading={isLoadingInsights}
-      />
+          {/* Connected Platform Performance Cards */}
+          <PlatformCardList
+            platformConfigs={PLATFORM_CONFIGS}
+            accounts={accounts}
+            syncingAccountId={syncingAccountId}
+            disconnectingAccountId={disconnectMutation.isPending ? disconnectMutation.variables : null}
+            activeHistoryAccountId={activeHistoryAccountId}
+            onConnect={handleOpenConnect}
+            onDisconnect={handleDisconnect}
+            onSync={handleSync}
+            onToggleHistory={handleToggleHistory}
+          />
 
-      {/* Rating Progression Line Chart */}
-      <RatingProgressionSection
-        ratingData={ratingData}
-        isLoading={isLoadingRating}
-      />
-
-      {/* Problem Distribution & Categorized Tiers */}
-      <ProblemDistributionSection
-        problemData={problemData}
-        isLoading={isLoadingProblem}
-      />
-
-      {/* Contest Performance & Competitive History */}
-      <ContestPerformanceSection
-        contestData={contestData}
-        isLoading={isLoadingContest}
-      />
-
-      {/* Coding Activity & Snapshot Telemetry Coverage */}
-      <CodingActivitySection
-        activityData={activityData}
-        isLoading={isLoadingActivity}
-      />
-
-      {/* Historical Performance Chart Section */}
-      {activeHistoryAccountId && (
-        <div className="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary-500/10 text-primary-500 flex items-center justify-center font-bold">
-                {activeHistoryAccount?.platform.charAt(0)}
+          {/* Historical Snapshots Drawer */}
+          {activeHistoryAccountId && activeHistoryAccount && (
+            <div className="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-surface-900 dark:text-white flex items-center gap-2">
+                    {PLATFORM_CONFIGS[activeHistoryAccount.platform].displayName} Historical Snapshot Telemetry
+                  </h3>
+                  <p className="text-xs text-surface-500">
+                    Inspecting recorded statistical states for @{activeHistoryAccount.username}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveHistoryAccountId(null)}
+                  className="text-xs font-semibold text-surface-400 hover:text-surface-600 dark:hover:text-surface-200"
+                >
+                  ✕ Close History
+                </button>
               </div>
-              <div>
-                <h3 className="text-base font-semibold text-surface-900 dark:text-white">
-                  {activeHistoryAccount?.platform} Snapshot Telemetry
-                </h3>
-                <p className="text-xs text-surface-500">
-                  Profile: @{activeHistoryAccount?.username}
-                </p>
-              </div>
+
+              <HistoricalStatsChart
+                snapshots={snapshotHistory}
+                platformName={PLATFORM_CONFIGS[activeHistoryAccount.platform].displayName}
+                isLoading={isLoadingHistory}
+              />
             </div>
-            <button
-              onClick={() => setActiveHistoryAccountId(null)}
-              className="text-xs text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
-            >
-              Close
-            </button>
-          </div>
-          <HistoricalStatsChart
-            snapshots={snapshotHistory}
-            isLoading={isLoadingHistory}
-            platformName={activeHistoryAccount?.platform}
+          )}
+
+          {/* Developer Factual Insights Preview */}
+          <PerformanceInsightsSection
+            insightsData={insightsData}
+            isLoading={isLoadingInsights}
           />
         </div>
       )}
 
-      {/* Supported Platforms Grid */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-surface-900 dark:text-white flex items-center gap-2">
-            <Globe className="w-5 h-5 text-primary-500" />
-            Supported Platforms ({accounts.length} / 6 connected)
-          </h2>
-          <span className="text-xs text-surface-500">Step 5E Advanced Analytics Engine</span>
+      {/* TAB 2: ADVANCED ANALYTICS */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Analytics Control Bar */}
+          <AnalyticsHeader
+            selectedPeriod={analyticsPeriod}
+            onPeriodChange={setAnalyticsPeriod}
+            selectedPlatform={analyticsPlatform}
+            onPlatformChange={setAnalyticsPlatform}
+            availablePlatforms={availableConnectedPlatforms}
+          />
+
+          {/* Developer Performance Insights */}
+          <PerformanceInsightsSection
+            insightsData={insightsData}
+            isLoading={isLoadingInsights}
+          />
+
+          {/* Rating Progression Line Chart (Separate LeetCode & Codeforces) */}
+          <RatingProgressionSection
+            ratingData={ratingData}
+            isLoading={isLoadingRating}
+          />
+
+          {/* Problem Distribution & Categorized Tiers */}
+          <ProblemDistributionSection
+            problemData={problemData}
+            isLoading={isLoadingProblem}
+          />
+
+          {/* Contest Performance & Competitive Rounds */}
+          <ContestPerformanceSection
+            contestData={contestData}
+            isLoading={isLoadingContest}
+          />
+
+          {/* Coding Activity & Snapshot Telemetry Coverage */}
+          <CodingActivitySection
+            activityData={activityData}
+            isLoading={isLoadingActivity}
+          />
+
+          {/* GitHub Insights */}
+          <GitHubInsightsSection
+            gitHubAccount={gitHubAccount}
+            onConnectGitHub={() => handleOpenConnect('GITHUB')}
+          />
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {(Object.keys(PLATFORM_CONFIGS) as CodingPlatform[]).map((platformKey) => {
-            const config = PLATFORM_CONFIGS[platformKey];
-            const account = accountByPlatform.get(platformKey);
-            const isConnected = Boolean(account && account.active);
-
-            return (
-              <div
-                key={platformKey}
-                className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 p-5 flex flex-col justify-between shadow-sm hover:border-surface-300 dark:hover:border-surface-700 transition-all"
-              >
-                <div>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${config.bgLight}`}>
-                        {config.displayName}
-                      </div>
-                      {config.communityApi && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
-                          title="Data sourced from community-backed AtCoder Problems API (kenkoooo.com)"
-                        >
-                          Community API
-                        </span>
-                      )}
-                      {config.requiresAuth && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                          title={config.syncNote}
-                        >
-                          OAuth2 Required
-                        </span>
-                      )}
-                      {config.enterpriseOnly && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-                          title={config.syncNote}
-                        >
-                          Enterprise Only
-                        </span>
-                      )}
-                      {!config.syncSupported && !config.requiresAuth && !config.enterpriseOnly && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                          title={config.syncNote}
-                        >
-                          Sync Restricted
-                        </span>
-                      )}
-                    </div>
-                    {isConnected ? (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Connected
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 dark:bg-surface-800 text-surface-500">
-                        <span className="w-1.5 h-1.5 rounded-full bg-surface-400" />
-                        Not Linked
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-surface-500 dark:text-surface-400 mb-3">
-                    {config.description}
-                  </p>
-
-                  {config.communityApi && (
-                    <div className="mb-3 p-2 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-700 dark:text-sky-300 flex items-start gap-1.5">
-                      <Globe className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span>{config.syncNote}</span>
-                    </div>
-                  )}
-
-                  {!config.syncSupported && (
-                    <div className="mb-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span>{config.syncNote}</span>
-                    </div>
-                  )}
-
-                  {isConnected && account ? (
-                    <div className="space-y-2 mb-4 p-3 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-800">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-surface-500">Username:</span>
-                        <a
-                          href={account.profileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
-                        >
-                          @{account.username}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-surface-500">Sync Status:</span>
-                        <span
-                          className={`font-semibold px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1 ${
-                            account.syncStatus === 'SUCCESS'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                              : account.syncStatus === 'FAILED'
-                              ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                              : account.syncStatus === 'PENDING'
-                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 animate-pulse'
-                              : 'bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300'
-                          }`}
-                        >
-                          {account.syncStatus === 'PENDING' && (
-                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                          )}
-                          {account.syncStatus}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-surface-500">Last Synced:</span>
-                        <span className="text-surface-500">
-                          {account.lastSyncedAt
-                            ? new Date(account.lastSyncedAt).toLocaleString()
-                            : 'Never synced'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-surface-500">Last Attempt:</span>
-                        <span className="text-surface-500">
-                          {account.lastSyncAttemptAt
-                            ? new Date(account.lastSyncAttemptAt).toLocaleString()
-                            : 'None'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-surface-500">Next Auto-Sync:</span>
-                        <span className="text-surface-500 font-mono text-[11px]">
-                          {account.lastSyncedAt
-                            ? `~${new Date(new Date(account.lastSyncedAt).getTime() + 6 * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                            : 'Every 6 hours'}
-                        </span>
-                      </div>
-
-                      {account.syncStatus === 'FAILED' && account.lastSyncError && (
-                        <div className={`p-2 mt-2 rounded border flex items-start gap-1.5 text-[11px] ${
-                          account.lastSyncError.toLowerCase().includes('rate limit') || account.lastSyncError.includes('429')
-                            ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400'
-                            : 'bg-red-50/80 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400'
-                        }`}>
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          <div className="flex flex-col">
-                            {account.lastSyncError.toLowerCase().includes('rate limit') && (
-                              <span className="font-semibold uppercase tracking-wider text-[10px]">Rate Limited</span>
-                            )}
-                            <span className="break-all">{account.lastSyncError}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {account.latestSnapshot && (
-                        <div className="pt-2 mt-2 border-t border-surface-200/60 dark:border-surface-700/60 grid grid-cols-2 gap-2 text-xs">
-                          {account.latestSnapshot.problemsSolved != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Solved</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                {account.latestSnapshot.problemsSolved}
-                              </span>
-                            </div>
-                          )}
-                          {account.latestSnapshot.currentRating != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Rating</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                {account.latestSnapshot.currentRating}
-                              </span>
-                            </div>
-                          )}
-                          {account.latestSnapshot.globalRank != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Rank</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                #{account.latestSnapshot.globalRank.toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                          {account.platform === 'GITHUB' && account.latestSnapshot.additionalStats?.publicRepos != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Public Repos</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                {String(account.latestSnapshot.additionalStats.publicRepos)}
-                              </span>
-                            </div>
-                          )}
-                          {account.platform === 'GITHUB' && account.latestSnapshot.additionalStats?.totalStars != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Total Stars</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                ★ {String(account.latestSnapshot.additionalStats.totalStars)}
-                              </span>
-                            </div>
-                          )}
-                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.communityAcRank != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Community AC Rank</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                #{Number(account.latestSnapshot.additionalStats.communityAcRank).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.ratedPointSum != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Rated Points</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                {Number(account.latestSnapshot.additionalStats.ratedPointSum).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.longestStreakDays != null && (
-                            <div>
-                              <span className="text-[10px] text-surface-400 block">Streak</span>
-                              <span className="font-bold text-surface-800 dark:text-surface-200">
-                                {Number(account.latestSnapshot.additionalStats.longestStreakDays)} days
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="pt-2 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between gap-2">
-                  {isConnected && account ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => syncMutation.mutate(account.id)}
-                          disabled={!config.syncSupported || syncMutation.isPending || account.syncStatus === 'PENDING'}
-                          className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1 disabled:opacity-50"
-                          title={!config.syncSupported ? 'Automated sync is disabled for this platform' : 'Synchronize live statistics from platform'}
-                        >
-                          <RefreshCw
-                            className={`w-3.5 h-3.5 ${
-                              syncMutation.isPending || account.syncStatus === 'PENDING'
-                                ? 'animate-spin'
-                                : ''
-                            }`}
-                          />
-                          {account.syncStatus === 'PENDING' ? 'Syncing...' : 'Sync'}
-                        </button>
-                        <button
-                          onClick={() =>
-                            setActiveHistoryAccountId(
-                              activeHistoryAccountId === account.id ? null : account.id
-                            )
-                          }
-                          className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          {activeHistoryAccountId === account.id ? 'Hide' : 'History'}
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleDisconnect(account.id)}
-                        disabled={disconnectMutation.isPending}
-                        className="text-xs font-medium text-red-500 hover:text-red-600 flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Disconnect
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => handleOpenConnect(platformKey)}
-                      className="w-full py-2 px-3 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Connect {config.displayName}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {/* TAB 3: PLATFORM COMPARISON */}
+      {activeTab === 'comparison' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          <PlatformComparisonSection
+            platformConfigs={PLATFORM_CONFIGS}
+            accounts={accounts}
+          />
         </div>
-      </div>
+      )}
+
+      {/* TAB 4: SYNCHRONIZATION HEALTH CENTER */}
+      {activeTab === 'syncHealth' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          <SyncHealthCenter
+            accounts={accounts}
+            platformConfigs={PLATFORM_CONFIGS}
+            syncingAccountId={syncingAccountId}
+            onSync={handleSync}
+            onRefreshAll={() => refetch()}
+            isRefreshing={isLoadingAccounts}
+          />
+        </div>
+      )}
 
       {/* Connect Account Modal */}
-      {selectedPlatform && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-800 shadow-2xl max-w-md w-full p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-surface-900 dark:text-white">
-                Connect {PLATFORM_CONFIGS[selectedPlatform].displayName}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-surface-500">
-              Enter your public handle on {PLATFORM_CONFIGS[selectedPlatform].displayName}. DevSync will verify the username and construct your public profile URL.
-            </p>
-
-            {!PLATFORM_CONFIGS[selectedPlatform].syncSupported && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold block">Automated Sync Notice:</span>
-                  <span>{PLATFORM_CONFIGS[selectedPlatform].syncNote}</span>
-                </div>
-              </div>
-            )}
-
-            {PLATFORM_CONFIGS[selectedPlatform].communityApi && (
-              <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-sky-700 dark:text-sky-300 flex items-start gap-2">
-                <Globe className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold block">Community Data Source:</span>
-                  <span>{PLATFORM_CONFIGS[selectedPlatform].syncNote}</span>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmitConnect} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">
-                  Public Username / Handle
-                </label>
-                <input
-                  type="text"
-                  value={usernameInput}
-                  onChange={(e) => {
-                    setUsernameInput(e.target.value);
-                    if (validationError) setValidationError(null);
-                  }}
-                  placeholder={PLATFORM_CONFIGS[selectedPlatform].usernamePlaceholder}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  autoFocus
-                />
-                {validationError && (
-                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {validationError}
-                  </p>
-                )}
-              </div>
-
-              {usernameInput.trim() && (
-                <div className="p-3 rounded-lg bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs">
-                  <span className="text-surface-500">Profile URL: </span>
-                  <span className="font-mono text-primary-600 dark:text-primary-400 break-all">
-                    {PLATFORM_CONFIGS[selectedPlatform].urlPrefix}
-                    {usernameInput.trim()}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-xs font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={connectMutation.isPending}
-                  className="px-4 py-2 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {connectMutation.isPending && (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  Save & Connect
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {modalPlatform && (
+        <ConnectAccountModal
+          platform={modalPlatform}
+          config={PLATFORM_CONFIGS[modalPlatform]}
+          isOpen={Boolean(modalPlatform)}
+          isSubmitting={connectMutation.isPending}
+          onClose={handleCloseModal}
+          onSubmit={handleSubmitConnect}
+        />
       )}
     </div>
   );

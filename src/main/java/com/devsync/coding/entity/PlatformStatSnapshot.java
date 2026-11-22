@@ -1,5 +1,7 @@
 package com.devsync.coding.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -45,8 +47,8 @@ public class PlatformStatSnapshot {
     @Column(name = "contests_participated")
     private Integer contestsParticipated;
 
-    @Convert(converter = JsonMapConverter.class)
-    @Column(name = "additional_stats", columnDefinition = "json")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "additional_stats")
     private Map<String, Object> additionalStats;
 
     @Column(name = "snapshot_at", nullable = false)

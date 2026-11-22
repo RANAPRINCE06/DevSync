@@ -121,4 +121,12 @@ export const codingIntelligenceService = {
     });
     return response.data.data;
   },
+
+  /**
+   * Retrieves supported platforms metadata and capability flags
+   */
+  async getSupportedPlatforms(): Promise<import('@/types/codingIntelligence').PlatformMetadata[]> {
+    const response = await apiClient.get<ApiResponse<import('@/types/codingIntelligence').PlatformMetadata[]>>('/coding/platforms');
+    return response.data.data;
+  },
 };
