@@ -14,7 +14,7 @@ public class CodingIntegrationProperties {
     private PlatformConfig leetcode = new PlatformConfig("https://leetcode.com/graphql", true);
     private PlatformConfig codechef = new PlatformConfig("https://api.codechef.com", false);
     private PlatformConfig hackerrank = new PlatformConfig("https://www.hackerrank.com/api", false);
-    private PlatformConfig atcoder = new PlatformConfig("https://atcoder.jp/api", false);
+    private PlatformConfig atcoder = new PlatformConfig("https://kenkoooo.com/atcoder/atcoder-api/v3", true);
 
     public int getConnectTimeoutMs() {
         return connectTimeoutMs;
@@ -83,6 +83,9 @@ public class CodingIntegrationProperties {
     public static class PlatformConfig {
         private String baseUrl;
         private boolean enabled;
+        private String clientId;
+        private String clientSecret;
+        private String apiToken;
 
         public PlatformConfig() {
         }
@@ -106,6 +109,30 @@ public class CodingIntegrationProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret;
+        }
+
+        public String getApiToken() {
+            return apiToken;
+        }
+
+        public void setApiToken(String apiToken) {
+            this.apiToken = apiToken;
         }
     }
 }

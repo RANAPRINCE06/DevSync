@@ -6,6 +6,8 @@ import com.devsync.coding.dto.PlatformSyncStatusResponse;
 import com.devsync.coding.entity.PlatformAccount;
 import com.devsync.coding.entity.PlatformStatSnapshot;
 
+import java.util.Set;
+
 public final class CodingProfileMapper {
 
     private CodingProfileMapper() {
@@ -28,7 +30,8 @@ public final class CodingProfileMapper {
                 account.getLastSyncError(),
                 account.getCreatedAt(),
                 account.getUpdatedAt(),
-                toSnapshotResponse(latestSnapshot)
+                toSnapshotResponse(latestSnapshot),
+                account.getPlatform() != null ? account.getPlatform().getCapabilities() : Set.of()
         );
     }
 

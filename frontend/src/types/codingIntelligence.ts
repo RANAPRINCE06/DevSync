@@ -6,6 +6,16 @@ export type CodingPlatform =
   | 'GITHUB'
   | 'ATCODER';
 
+export type PlatformCapability =
+  | 'PROFILE_LINK_SUPPORTED'
+  | 'AUTOMATED_SYNC_SUPPORTED'
+  | 'AUTHENTICATED_SYNC_REQUIRED'
+  | 'COMMUNITY_API_SUPPORTED'
+  | 'CONTEST_RATING_SUPPORTED'
+  | 'PROBLEM_COUNTS_SUPPORTED'
+  | 'DIFFICULTY_BREAKDOWN_SUPPORTED'
+  | 'ACTIVITY_HISTORY_SUPPORTED';
+
 export type SyncStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'NEVER_SYNCED';
 
 export interface PlatformAccount {
@@ -21,6 +31,7 @@ export interface PlatformAccount {
   lastSyncAttemptAt: string | null;
   lastSyncError: string | null;
   latestSnapshot?: PlatformStatSnapshot | null;
+  capabilities?: PlatformCapability[];
   createdAt: string;
   updatedAt: string;
 }
@@ -90,6 +101,23 @@ export interface PlatformConfig {
   description: string;
   usernameRegex: RegExp;
   usernamePlaceholder: string;
+  syncSupported: boolean;
+  communityApi?: boolean;
+  requiresAuth?: boolean;
+  enterpriseOnly?: boolean;
+  syncNote?: string;
+  capabilities?: PlatformCapability[];
+}
+
+export interface PlatformMetadata {
+  platform: CodingPlatform;
+  displayName: string;
+  profileUrlBase: string;
+  available: boolean;
+  syncSupported: boolean;
+  communityApi: boolean;
+  capabilities: PlatformCapability[];
+  syncNote: string;
 }
 
 export interface AnalyticsQueryParams {

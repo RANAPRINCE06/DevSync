@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -259,5 +260,35 @@ class GoalOwnershipSecurityTest {
                         .header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Personal Resource Isolation — Request manipulation cannot convert or reassign goal ownership")
+    void updateGoal_RequestManipulation_CannotAlterOwnershipOrTeam() throws Exception {
+        // Attempt update with injected ownerId / teamId payload
+        String maliciousPayload = """
+                {
+                    "title": "Alice Legitimate Update",
+                    "description": "Updated description",
+                    "priority": "HIGH",
+                    "progressPercentage": 40,
+                    "status": "IN_PROGRESS",
+                    "ownerId": "%s",
+                    "teamId": "%s"
+                }
+                """.formatted(userB.getId(), UUID.randomUUID());
+
+        mockMvc.perform(put("/api/v1/goals/" + goalA.getId())
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(maliciousPayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.ownerId").value(userA.getId().toString()))
+                .andExpect(jsonPath("$.data.teamId").value(team.getId().toString()));
+
+        Goal persisted = goalRepository.findById(goalA.getId()).orElseThrow();
+        assertEquals(userA.getId(), persisted.getOwner().getId(), "Goal owner must remain Alice");
+        assertEquals(team.getId(), persisted.getTeam().getId(), "Team association must remain immutable");
     }
 }

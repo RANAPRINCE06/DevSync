@@ -34,6 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -305,5 +306,35 @@ class TaskOwnershipSecurityTest {
                         .header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Task Ownership Immutability — Injected assigneeId or goalId cannot reassign task")
+    void updateTask_RequestManipulation_CannotReassignTaskOrAlterGoal() throws Exception {
+        String maliciousPayload = """
+                {
+                    "title": "Legitimate Alice Task Title",
+                    "description": "Legitimate description",
+                    "priority": "HIGH",
+                    "dueDate": "%s",
+                    "status": "IN_PROGRESS",
+                    "actualMinutes": 45,
+                    "assigneeId": "%s",
+                    "goalId": "%s"
+                }
+                """.formatted(LocalDate.now().plusWeeks(1), userB.getId(), goalB.getId());
+
+        mockMvc.perform(put("/api/v1/tasks/" + taskA.getId())
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(maliciousPayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assigneeId").value(userA.getId().toString()))
+                .andExpect(jsonPath("$.data.goalId").value(goalA.getId().toString()));
+
+        Task persisted = taskRepository.findById(taskA.getId()).orElseThrow();
+        assertEquals(userA.getId(), persisted.getAssignee().getId(), "Assignee must remain Alice");
+        assertEquals(goalA.getId(), persisted.getGoal().getId(), "Parent goal must remain goalA");
     }
 }

@@ -226,4 +226,26 @@ class ProgressOwnershipSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
     }
+
+    @Test
+    @DisplayName("Date Range Filtering — Caller can filter own progress by date range while isolating other users")
+    void userA_CanFilterOwnProgressByDateRange_ExcludesUserB() throws Exception {
+        String today = LocalDate.now().toString();
+
+        // Alice queries her own progress with date range
+        mockMvc.perform(get("/api/v1/progress?fromDate=" + today + "&toDate=" + today)
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].id").value(progressA.getId().toString()));
+
+        // Bob querying date range only gets Bob's progress
+        mockMvc.perform(get("/api/v1/progress?fromDate=" + today + "&toDate=" + today)
+                        .header("Authorization", "Bearer " + tokenB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].id").value(progressB.getId().toString()));
+    }
 }

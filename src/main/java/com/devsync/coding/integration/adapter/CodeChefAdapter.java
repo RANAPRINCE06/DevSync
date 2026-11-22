@@ -11,18 +11,22 @@ import org.springframework.stereotype.Component;
 /**
  * CodeChef adapter enforcing legitimate integration boundaries.
  *
- * In accordance with DevSync Step 5B specifications:
- * - CodeChef deprecated its public open API and requires registered partner OAuth2 credentials.
- * - In keeping with security best practices, fragile HTML scraping and Cloudflare bypasses are strictly avoided.
- * - This adapter documents and enforces an explicit unavailable/unsupported state until official OAuth2 credentials are configured.
+ * In accordance with DevSync Step 6A specifications:
+ * - CodeChef deprecated open developer self-registration and requires registered partner OAuth2 credentials.
+ * - Fragile HTML scraping and Cloudflare bypasses are strictly prohibited to comply with platform terms of service.
+ * - This adapter enforces profile linking and informs users of OAuth2 partner credential requirements.
  */
 @Component
 public class CodeChefAdapter implements CodingPlatformAdapter {
 
     private final boolean enabled;
+    private final String clientId;
+    private final String clientSecret;
 
     public CodeChefAdapter(CodingIntegrationProperties properties) {
         this.enabled = properties.getCodechef().isEnabled();
+        this.clientId = properties.getCodechef().getClientId();
+        this.clientSecret = properties.getCodechef().getClientSecret();
     }
 
     @Override
@@ -48,8 +52,13 @@ public class CodeChefAdapter implements CodingPlatformAdapter {
             );
         }
 
-        // When official partner OAuth credentials become available in a future release,
-        // authenticated API queries against https://api.codechef.com will be orchestrated here.
-        throw new PlatformUnsupportedException("CodeChef official API client credentials not configured.");
+        if (clientId == null || clientId.trim().isEmpty() || clientSecret == null || clientSecret.trim().isEmpty()) {
+            throw new PlatformUnsupportedException(
+                    "CodeChef official API client credentials not configured. " +
+                    "Registered partner OAuth2 credentials (clientId, clientSecret) are required for automated synchronization."
+            );
+        }
+
+        throw new PlatformUnsupportedException("CodeChef official partner OAuth2 synchronization flow not active.");
     }
 }

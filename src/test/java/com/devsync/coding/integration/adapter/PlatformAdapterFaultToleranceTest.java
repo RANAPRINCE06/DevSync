@@ -309,8 +309,9 @@ class PlatformAdapterFaultToleranceTest {
         }
 
         @Test
-        @DisplayName("AtCoder throws PlatformUnsupportedException safely without scraping")
+        @DisplayName("AtCoder throws PlatformUnsupportedException safely when client is unconfigured or disabled")
         void atCoderThrowsUnsupportedSafely() {
+            properties.getAtcoder().setEnabled(false);
             AtCoderAdapter adapter = new AtCoderAdapter(properties);
             assertEquals(CodingPlatform.ATCODER, adapter.getPlatform());
             assertTrue(adapter.validateUsername("chokudai"));
@@ -318,6 +319,26 @@ class PlatformAdapterFaultToleranceTest {
             PlatformUnsupportedException ex = assertThrows(PlatformUnsupportedException.class,
                     () -> adapter.fetchProfileData("chokudai"));
             assertTrue(ex.getMessage().contains("AtCoder"));
+        }
+
+        @Test
+        @DisplayName("AtCoder with client parses community data and handles failures gracefully")
+        void atCoderWithClientFaultTolerance() {
+            CodingPlatformClient mockClient = mock(CodingPlatformClient.class);
+            properties.getAtcoder().setEnabled(true);
+            AtCoderAdapter adapter = new AtCoderAdapter(mockClient, properties);
+
+            AtCoderAdapter.AtCoderRankResponse ac = new AtCoderAdapter.AtCoderRankResponse(100, 2000);
+            when(mockClient.get(contains("/user/ac_rank"), eq(AtCoderAdapter.AtCoderRankResponse.class), any()))
+                    .thenReturn(ac);
+            when(mockClient.get(contains("/user/rated_point_sum_rank"), eq(AtCoderAdapter.AtCoderRankResponse.class), any()))
+                    .thenThrow(new PlatformIntegrationException("Timeout"));
+
+            ExternalProfileData data = adapter.fetchProfileData("chokudai");
+            assertNotNull(data);
+            assertEquals(100, data.getProblemsSolved());
+            assertEquals(2000L, data.getGlobalRank());
+            assertNull(data.getCurrentRating());
         }
     }
 

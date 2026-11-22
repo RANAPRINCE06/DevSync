@@ -51,6 +51,7 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     description: 'Algorithms, data structures & contest rating',
     usernameRegex: /^[a-zA-Z0-9_-]{3,30}$/,
     usernamePlaceholder: 'e.g. tour_de_code',
+    syncSupported: true,
   },
   CODEFORCES: {
     name: 'Codeforces',
@@ -63,6 +64,7 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     description: 'Competitive programming rounds & max rating',
     usernameRegex: /^[a-zA-Z0-9_.-]{3,24}$/,
     usernamePlaceholder: 'e.g. tourist',
+    syncSupported: true,
   },
   CODECHEF: {
     name: 'CodeChef',
@@ -75,6 +77,9 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     description: 'Star rating, global rank & contest divisions',
     usernameRegex: /^[a-zA-Z0-9_]{3,30}$/,
     usernamePlaceholder: 'e.g. chef_coder',
+    syncSupported: false,
+    requiresAuth: true,
+    syncNote: 'Automated sync is currently disabled (requires official OAuth2 partner credentials). Profile linking is active.',
   },
   HACKERRANK: {
     name: 'HackerRank',
@@ -87,6 +92,9 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     description: 'Skill badges, certifications & practice domains',
     usernameRegex: /^[a-zA-Z0-9_]{3,30}$/,
     usernamePlaceholder: 'e.g. hack_master',
+    syncSupported: false,
+    enterpriseOnly: true,
+    syncNote: 'Automated sync is currently disabled (official API requires enterprise authorization). Profile linking is active.',
   },
   GITHUB: {
     name: 'GitHub',
@@ -99,6 +107,7 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     description: 'Public repositories, commits & open source streak',
     usernameRegex: /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/,
     usernamePlaceholder: 'e.g. octocat',
+    syncSupported: true,
   },
   ATCODER: {
     name: 'AtCoder',
@@ -108,9 +117,12 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     iconName: 'AtCoder',
     color: '#222222',
     bgLight: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-    description: 'AtCoder Beginner & Regular Contests (ABC / ARC)',
+    description: 'AtCoder Beginner & Regular Contests (Kenkoooo Problems API)',
     usernameRegex: /^[a-zA-Z0-9_]{3,16}$/,
     usernamePlaceholder: 'e.g. chokudai',
+    syncSupported: true,
+    communityApi: true,
+    syncNote: 'Synchronized via community AtCoder Problems API (kenkoooo.com). Solved problems, rated point sum, and streaks are tracked.',
   },
 };
 
@@ -384,10 +396,42 @@ export const CodingIntelligencePage: React.FC = () => {
               >
                 <div>
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${config.bgLight}`}>
                         {config.displayName}
                       </div>
+                      {config.communityApi && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                          title="Data sourced from community-backed AtCoder Problems API (kenkoooo.com)"
+                        >
+                          Community API
+                        </span>
+                      )}
+                      {config.requiresAuth && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                          title={config.syncNote}
+                        >
+                          OAuth2 Required
+                        </span>
+                      )}
+                      {config.enterpriseOnly && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                          title={config.syncNote}
+                        >
+                          Enterprise Only
+                        </span>
+                      )}
+                      {!config.syncSupported && !config.requiresAuth && !config.enterpriseOnly && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                          title={config.syncNote}
+                        >
+                          Sync Restricted
+                        </span>
+                      )}
                     </div>
                     {isConnected ? (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -402,9 +446,23 @@ export const CodingIntelligencePage: React.FC = () => {
                     )}
                   </div>
 
-                  <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
+                  <p className="text-xs text-surface-500 dark:text-surface-400 mb-3">
                     {config.description}
                   </p>
+
+                  {config.communityApi && (
+                    <div className="mb-3 p-2 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-700 dark:text-sky-300 flex items-start gap-1.5">
+                      <Globe className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{config.syncNote}</span>
+                    </div>
+                  )}
+
+                  {!config.syncSupported && (
+                    <div className="mb-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>{config.syncNote}</span>
+                    </div>
+                  )}
 
                   {isConnected && account ? (
                     <div className="space-y-2 mb-4 p-3 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-800">
@@ -522,6 +580,30 @@ export const CodingIntelligencePage: React.FC = () => {
                               </span>
                             </div>
                           )}
+                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.communityAcRank != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Community AC Rank</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                #{Number(account.latestSnapshot.additionalStats.communityAcRank).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.ratedPointSum != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Rated Points</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                {Number(account.latestSnapshot.additionalStats.ratedPointSum).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {account.platform === 'ATCODER' && account.latestSnapshot.additionalStats?.longestStreakDays != null && (
+                            <div>
+                              <span className="text-[10px] text-surface-400 block">Streak</span>
+                              <span className="font-bold text-surface-800 dark:text-surface-200">
+                                {Number(account.latestSnapshot.additionalStats.longestStreakDays)} days
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -534,9 +616,9 @@ export const CodingIntelligencePage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => syncMutation.mutate(account.id)}
-                          disabled={syncMutation.isPending || account.syncStatus === 'PENDING'}
+                          disabled={!config.syncSupported || syncMutation.isPending || account.syncStatus === 'PENDING'}
                           className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1 disabled:opacity-50"
-                          title="Synchronize live statistics from platform"
+                          title={!config.syncSupported ? 'Automated sync is disabled for this platform' : 'Synchronize live statistics from platform'}
                         >
                           <RefreshCw
                             className={`w-3.5 h-3.5 ${
@@ -603,6 +685,26 @@ export const CodingIntelligencePage: React.FC = () => {
             <p className="text-xs text-surface-500">
               Enter your public handle on {PLATFORM_CONFIGS[selectedPlatform].displayName}. DevSync will verify the username and construct your public profile URL.
             </p>
+
+            {!PLATFORM_CONFIGS[selectedPlatform].syncSupported && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block">Automated Sync Notice:</span>
+                  <span>{PLATFORM_CONFIGS[selectedPlatform].syncNote}</span>
+                </div>
+              </div>
+            )}
+
+            {PLATFORM_CONFIGS[selectedPlatform].communityApi && (
+              <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-sky-700 dark:text-sky-300 flex items-start gap-2">
+                <Globe className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block">Community Data Source:</span>
+                  <span>{PLATFORM_CONFIGS[selectedPlatform].syncNote}</span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmitConnect} className="space-y-4">
               <div>

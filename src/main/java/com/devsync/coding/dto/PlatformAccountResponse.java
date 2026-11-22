@@ -1,9 +1,11 @@
 package com.devsync.coding.dto;
 
 import com.devsync.coding.enums.CodingPlatform;
+import com.devsync.coding.enums.PlatformCapability;
 import com.devsync.coding.enums.SyncStatus;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 public class PlatformAccountResponse {
@@ -21,14 +23,25 @@ public class PlatformAccountResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private PlatformStatSnapshotResponse latestSnapshot;
+    private Set<PlatformCapability> capabilities;
 
     public PlatformAccountResponse() {
     }
 
     public PlatformAccountResponse(UUID id, CodingPlatform platform, String platformDisplayName, String username,
+                                    String profileUrl, boolean active, SyncStatus syncStatus, Instant lastSyncedAt,
+                                    Instant lastSyncAttemptAt, String lastSyncError, Instant createdAt,
+                                    Instant updatedAt, PlatformStatSnapshotResponse latestSnapshot) {
+        this(id, platform, platformDisplayName, username, profileUrl, active, syncStatus, lastSyncedAt,
+                lastSyncAttemptAt, lastSyncError, createdAt, updatedAt, latestSnapshot,
+                platform != null ? platform.getCapabilities() : Set.of());
+    }
+
+    public PlatformAccountResponse(UUID id, CodingPlatform platform, String platformDisplayName, String username,
                                    String profileUrl, boolean active, SyncStatus syncStatus, Instant lastSyncedAt,
                                    Instant lastSyncAttemptAt, String lastSyncError, Instant createdAt,
-                                   Instant updatedAt, PlatformStatSnapshotResponse latestSnapshot) {
+                                   Instant updatedAt, PlatformStatSnapshotResponse latestSnapshot,
+                                   Set<PlatformCapability> capabilities) {
         this.id = id;
         this.platform = platform;
         this.platformDisplayName = platformDisplayName;
@@ -42,6 +55,7 @@ public class PlatformAccountResponse {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.latestSnapshot = latestSnapshot;
+        this.capabilities = capabilities;
     }
 
     public UUID getId() {
@@ -146,5 +160,13 @@ public class PlatformAccountResponse {
 
     public void setLatestSnapshot(PlatformStatSnapshotResponse latestSnapshot) {
         this.latestSnapshot = latestSnapshot;
+    }
+
+    public Set<PlatformCapability> getCapabilities() {
+        return capabilities;
+    }
+
+    public void setCapabilities(Set<PlatformCapability> capabilities) {
+        this.capabilities = capabilities;
     }
 }

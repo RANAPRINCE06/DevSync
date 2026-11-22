@@ -210,5 +210,24 @@ class TeamAccessSecurityTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }
+
+    @Test
+    @DisplayName("Inactive team blocks all member access — returns 404 Not Found")
+    void inactiveTeam_BlocksMemberAccess_Returns404() throws Exception {
+        // Deactivate teamAlpha completely
+        teamAlpha.setActive(false);
+        teamRepository.save(teamAlpha);
+
+        // Even though Alice is OWNER and Bob is MEMBER, both receive 404
+        mockMvc.perform(get("/api/v1/teams/" + teamAlpha.getId())
+                        .header("Authorization", "Bearer " + tokenAlice))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+
+        mockMvc.perform(get("/api/v1/teams/" + teamAlpha.getId())
+                        .header("Authorization", "Bearer " + tokenBob))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
 }
 

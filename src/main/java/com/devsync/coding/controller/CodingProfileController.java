@@ -3,7 +3,9 @@ package com.devsync.coding.controller;
 import com.devsync.coding.dto.CodingStatisticsResponse;
 import com.devsync.coding.dto.ConnectPlatformRequest;
 import com.devsync.coding.dto.PlatformAccountResponse;
+import com.devsync.coding.dto.PlatformMetadataResponse;
 import com.devsync.coding.dto.PlatformStatSnapshotResponse;
+import com.devsync.coding.enums.CodingPlatform;
 import com.devsync.coding.service.CodingProfileService;
 import com.devsync.coding.service.CodingStatisticsService;
 import com.devsync.common.response.ApiResponse;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +37,15 @@ public class CodingProfileController {
                                    CodingStatisticsService codingStatisticsService) {
         this.codingProfileService = codingProfileService;
         this.codingStatisticsService = codingStatisticsService;
+    }
+
+    @GetMapping("/platforms")
+    @Operation(summary = "List supported platforms and capabilities", description = "Retrieve all available competitive programming platforms with support flags and capabilities")
+    public ResponseEntity<ApiResponse<List<PlatformMetadataResponse>>> getSupportedPlatforms() {
+        List<PlatformMetadataResponse> platforms = Arrays.stream(CodingPlatform.values())
+                .map(PlatformMetadataResponse::from)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success(platforms));
     }
 
     @PostMapping("/accounts")

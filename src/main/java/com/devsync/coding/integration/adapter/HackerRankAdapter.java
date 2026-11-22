@@ -8,6 +8,14 @@ import com.devsync.coding.integration.exception.PlatformIntegrationException;
 import com.devsync.coding.integration.exception.PlatformUnsupportedException;
 import org.springframework.stereotype.Component;
 
+/**
+ * HackerRank adapter enforcing legitimate integration boundaries.
+ *
+ * In accordance with DevSync Step 6A specifications:
+ * - HackerRank official REST APIs are restricted exclusively to enterprise assessment workflows (HackerRank for Work).
+ * - Individual developer challenge profiles and badges cannot be synchronized without fragile/prohibited HTML scraping.
+ * - This adapter enforces profile linking while explicitly disabling individual statistics synchronization.
+ */
 @Component
 public class HackerRankAdapter implements CodingPlatformAdapter {
 
@@ -39,6 +47,9 @@ public class HackerRankAdapter implements CodingPlatformAdapter {
             );
         }
 
-        throw new PlatformUnsupportedException("HackerRank integration not yet active.");
+        throw new PlatformUnsupportedException(
+                "HackerRank official APIs are restricted exclusively to enterprise assessment workflows (HackerRank for Work). " +
+                "Individual developer challenge profiles cannot be synchronized without prohibited HTML scraping."
+        );
     }
 }

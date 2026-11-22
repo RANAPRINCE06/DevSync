@@ -68,8 +68,8 @@ app:
         base-url: ${HACKERRANK_API_URL:https://www.hackerrank.com/api}
         enabled: false
       atcoder:
-        base-url: ${ATCODER_API_URL:https://atcoder.jp/api}
-        enabled: false
+        base-url: ${ATCODER_API_URL:https://kenkoooo.com/atcoder/atcoder-api/v3}
+        enabled: true
     sync:
       enabled: ${CODING_SYNC_ENABLED:true}
       fixed-delay-ms: ${CODING_SYNC_FIXED_DELAY_MS:21600000}
@@ -92,8 +92,8 @@ app:
             capacity: 5
             refill-rate-per-second: 0.5
           ATCODER:
-            capacity: 5
-            refill-rate-per-second: 0.5
+            capacity: 1
+            refill-rate-per-second: 1.0
           CODECHEF:
             capacity: 1
             refill-rate-per-second: 0.1
