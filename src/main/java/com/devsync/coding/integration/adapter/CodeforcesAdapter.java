@@ -116,6 +116,16 @@ public class CodeforcesAdapter implements CodingPlatformAdapter {
         if (user.organization != null) additionalStats.put("organization", user.organization);
         if (rawAcceptedCount != null) additionalStats.put("rawAcceptedSubmissions", rawAcceptedCount);
         if (submissionsChecked != null) additionalStats.put("submissionsChecked", submissionsChecked);
+        if (user.titlePhoto != null && !user.titlePhoto.trim().isEmpty()) {
+            additionalStats.put("avatarUrl", user.titlePhoto.trim());
+        } else if (user.avatar != null && !user.avatar.trim().isEmpty()) {
+            additionalStats.put("avatarUrl", user.avatar.trim());
+        }
+        String fullName = ((user.firstName != null ? user.firstName : "") + " " +
+                           (user.lastName != null ? user.lastName : "")).trim();
+        if (!fullName.isEmpty()) {
+            additionalStats.put("displayName", fullName);
+        }
 
         String profileUrl = CodingPlatform.CODEFORCES.buildProfileUrl(username);
 
@@ -160,6 +170,10 @@ public class CodeforcesAdapter implements CodingPlatformAdapter {
         public String country;
         public String city;
         public String organization;
+        public String titlePhoto;
+        public String avatar;
+        public String firstName;
+        public String lastName;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

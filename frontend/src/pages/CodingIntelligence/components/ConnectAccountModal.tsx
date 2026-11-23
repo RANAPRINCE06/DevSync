@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { AlertCircle, Globe } from 'lucide-react';
+import { AlertCircle, Globe, Link2, User } from 'lucide-react';
 import { CodingPlatform, PlatformConfig } from '@/types/codingIntelligence';
+import { detectPlatformFromUrl } from '@/utils/platformUrlDetector';
 
 interface ConnectAccountModalProps {
   platform: CodingPlatform;
@@ -19,6 +20,8 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const [mode, setMode] = useState<'url' | 'username'>('url');
+  const [urlInput, setUrlInput] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -26,14 +29,39 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanUsername = usernameInput.trim();
 
-    if (!cleanUsername) {
+    let targetUsername = usernameInput.trim();
+
+    if (mode === 'url') {
+      const cleanUrl = urlInput.trim();
+      if (!cleanUrl) {
+        setValidationError('Please paste your public profile URL.');
+        return;
+      }
+      const detected = detectPlatformFromUrl(cleanUrl);
+      if (!detected) {
+        setValidationError(`Invalid or unrecognized URL. Expected a valid ${config.displayName} profile URL.`);
+        return;
+      }
+      if (detected.platform !== platform) {
+        setValidationError(
+          `URL belongs to ${detected.platformDisplayName}, but you are linking ${config.displayName}. Please use a ${config.displayName} URL.`
+        );
+        return;
+      }
+      if (!detected.isValid) {
+        setValidationError(detected.errorMessage || 'Invalid profile URL structure');
+        return;
+      }
+      targetUsername = detected.username;
+    }
+
+    if (!targetUsername) {
       setValidationError('Please enter a valid platform handle.');
       return;
     }
 
-    if (!config.usernameRegex.test(cleanUsername)) {
+    if (!config.usernameRegex.test(targetUsername)) {
       setValidationError(
         `Invalid username format. ${config.displayName} handles must match: ${config.usernamePlaceholder}`
       );
@@ -41,7 +69,7 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
     }
 
     setValidationError(null);
-    onSubmit(platform, cleanUsername);
+    onSubmit(platform, targetUsername);
   };
 
   return (
@@ -59,9 +87,37 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
           </button>
         </div>
 
-        <p className="text-xs text-surface-500">
-          Enter your public handle on {config.displayName}. DevSync will verify handle structure and build your verified profile link.
-        </p>
+        {/* Input Mode Selector */}
+        <div className="flex rounded-lg bg-surface-100 dark:bg-surface-800 p-1 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('url');
+              setValidationError(null);
+            }}
+            className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'url'
+                ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-xs'
+                : 'text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'
+            }`}
+          >
+            <Link2 className="w-3.5 h-3.5" /> Paste Profile URL
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('username');
+              setValidationError(null);
+            }}
+            className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'username'
+                ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-white shadow-xs'
+                : 'text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" /> Enter Handle
+          </button>
+        </div>
 
         {config.communityApi && (
           <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-sky-700 dark:text-sky-300 flex items-start gap-2">
@@ -84,37 +140,47 @@ export const ConnectAccountModal: React.FC<ConnectAccountModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
-              Public Handle / Username
-            </label>
-            <input
-              type="text"
-              value={usernameInput}
-              onChange={(e) => {
-                setUsernameInput(e.target.value);
-                if (validationError) setValidationError(null);
-              }}
-              placeholder={config.usernamePlaceholder}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-              autoFocus
-            />
-            {validationError && (
-              <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {validationError}
-              </p>
-            )}
-          </div>
-
-          {usernameInput.trim() && (
-            <div className="p-3 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs flex items-center justify-between gap-2">
-              <span className="text-surface-500">Constructed URL:</span>
-              <span className="font-mono text-primary-600 dark:text-primary-400 font-medium break-all text-right">
-                {config.urlPrefix}
-                {usernameInput.trim()}
-              </span>
+          {mode === 'url' ? (
+            <div>
+              <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
+                Public {config.displayName} Profile URL
+              </label>
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => {
+                  setUrlInput(e.target.value);
+                  if (validationError) setValidationError(null);
+                }}
+                placeholder={`${config.urlPrefix}your-handle`}
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                autoFocus
+              />
             </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1.5">
+                Public Handle / Username
+              </label>
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={(e) => {
+                  setUsernameInput(e.target.value);
+                  if (validationError) setValidationError(null);
+                }}
+                placeholder={config.usernamePlaceholder}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                autoFocus
+              />
+            </div>
+          )}
+
+          {validationError && (
+            <p className="text-xs text-red-500 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {validationError}
+            </p>
           )}
 
           <div className="flex items-center justify-end gap-3 pt-2">

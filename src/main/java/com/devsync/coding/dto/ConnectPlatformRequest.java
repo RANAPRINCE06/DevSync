@@ -1,18 +1,21 @@
 package com.devsync.coding.dto;
 
 import com.devsync.coding.enums.CodingPlatform;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 
+@Schema(description = "Request to connect a competitive programming platform account either by URL or (platform, username)")
 public class ConnectPlatformRequest {
 
-    @NotNull(message = "Platform is required")
+    @Schema(description = "Coding platform enum (optional if profileUrl provided)")
     private CodingPlatform platform;
 
-    @NotBlank(message = "Username is required")
-    @Size(min = 1, max = 100, message = "Username must be between 1 and 100 characters")
+    @Size(max = 100, message = "Username must be up to 100 characters")
+    @Schema(description = "Platform username / handle (optional if profileUrl provided)")
     private String username;
+
+    @Schema(description = "Public profile URL (optional if platform and username provided)")
+    private String profileUrl;
 
     public ConnectPlatformRequest() {
     }
@@ -20,6 +23,16 @@ public class ConnectPlatformRequest {
     public ConnectPlatformRequest(CodingPlatform platform, String username) {
         this.platform = platform;
         this.username = username;
+    }
+
+    public ConnectPlatformRequest(CodingPlatform platform, String username, String profileUrl) {
+        this.platform = platform;
+        this.username = username;
+        this.profileUrl = profileUrl;
+    }
+
+    public ConnectPlatformRequest(String profileUrl) {
+        this.profileUrl = profileUrl;
     }
 
     public CodingPlatform getPlatform() {
@@ -36,5 +49,13 @@ public class ConnectPlatformRequest {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getProfileUrl() {
+        return profileUrl;
+    }
+
+    public void setProfileUrl(String profileUrl) {
+        this.profileUrl = profileUrl;
     }
 }

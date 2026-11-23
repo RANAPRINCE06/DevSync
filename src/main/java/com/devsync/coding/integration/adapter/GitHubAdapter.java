@@ -79,6 +79,8 @@ public class GitHubAdapter implements CodingPlatformAdapter {
 
         // 3. Assemble Additional Statistics Map
         Map<String, Object> additionalStats = new LinkedHashMap<>();
+        if (user.name != null && !user.name.trim().isEmpty()) additionalStats.put("displayName", user.name.trim());
+        if (user.avatarUrl != null && !user.avatarUrl.trim().isEmpty()) additionalStats.put("avatarUrl", user.avatarUrl.trim());
         if (user.publicRepos != null) additionalStats.put("publicRepos", user.publicRepos);
         if (user.publicGists != null) additionalStats.put("publicGists", user.publicGists);
         if (user.followers != null) additionalStats.put("followers", user.followers);
@@ -121,6 +123,8 @@ public class GitHubAdapter implements CodingPlatformAdapter {
     public static class GitHubUserResponse {
         public String login;
         public String name;
+        @JsonProperty("avatar_url")
+        public String avatarUrl;
         @JsonProperty("public_repos")
         public Integer publicRepos;
         @JsonProperty("public_gists")

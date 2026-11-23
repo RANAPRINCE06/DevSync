@@ -6,6 +6,7 @@ import {
   PlatformSyncStatus,
   CodingStatistics,
   ConnectPlatformRequest,
+  ProfilePreviewResponse,
 } from '@/types/codingIntelligence';
 
 export const codingIntelligenceService = {
@@ -14,6 +15,16 @@ export const codingIntelligenceService = {
    */
   async getConnectedAccounts(): Promise<PlatformAccount[]> {
     const response = await apiClient.get<ApiResponse<PlatformAccount[]>>('/coding/accounts');
+    return response.data.data;
+  },
+
+  /**
+   * Previews a public coding profile from URL without persistence
+   */
+  async previewProfile(profileUrl: string): Promise<ProfilePreviewResponse> {
+    const response = await apiClient.post<ApiResponse<ProfilePreviewResponse>>('/coding/accounts/preview', {
+      profileUrl,
+    });
     return response.data.data;
   },
 

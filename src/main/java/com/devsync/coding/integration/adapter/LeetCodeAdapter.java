@@ -27,6 +27,8 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
             "    profile {\n" +
             "      ranking\n" +
             "      reputation\n" +
+            "      realName\n" +
+            "      userAvatar\n" +
             "    }\n" +
             "    submitStatsGlobal {\n" +
             "      acSubmissionNum {\n" +
@@ -150,6 +152,12 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
             if (matchedUser.profile.reputation != null) {
                 additionalStats.put("reputation", matchedUser.profile.reputation);
             }
+            if (matchedUser.profile.realName != null && !matchedUser.profile.realName.trim().isEmpty()) {
+                additionalStats.put("displayName", matchedUser.profile.realName.trim());
+            }
+            if (matchedUser.profile.userAvatar != null && !matchedUser.profile.userAvatar.trim().isEmpty()) {
+                additionalStats.put("avatarUrl", matchedUser.profile.userAvatar.trim());
+            }
         }
 
         String profileUrl = CodingPlatform.LEETCODE.buildProfileUrl(username);
@@ -200,6 +208,8 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
     public static class LeetCodeProfile {
         public Integer ranking;
         public Integer reputation;
+        public String realName;
+        public String userAvatar;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

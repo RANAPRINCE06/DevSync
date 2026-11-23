@@ -3,6 +3,7 @@ package com.devsync.coding.service;
 import com.devsync.coding.dto.ConnectPlatformRequest;
 import com.devsync.coding.dto.PlatformAccountResponse;
 import com.devsync.coding.dto.PlatformStatSnapshotResponse;
+import com.devsync.coding.dto.ProfilePreviewResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface CodingProfileService {
+
+    ProfilePreviewResponse previewProfile(String rawUrl);
 
     PlatformAccountResponse connectPlatform(ConnectPlatformRequest request);
 

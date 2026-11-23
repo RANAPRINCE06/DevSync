@@ -49,6 +49,12 @@ export const usePlatformHistory = (accountId: string | null) => {
   });
 };
 
+export const usePreviewCodingProfile = () => {
+  return useMutation({
+    mutationFn: (profileUrl: string) => codingIntelligenceService.previewProfile(profileUrl),
+  });
+};
+
 export const useConnectPlatform = () => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();

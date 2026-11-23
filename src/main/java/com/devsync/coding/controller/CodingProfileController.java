@@ -5,6 +5,8 @@ import com.devsync.coding.dto.ConnectPlatformRequest;
 import com.devsync.coding.dto.PlatformAccountResponse;
 import com.devsync.coding.dto.PlatformMetadataResponse;
 import com.devsync.coding.dto.PlatformStatSnapshotResponse;
+import com.devsync.coding.dto.ProfilePreviewRequest;
+import com.devsync.coding.dto.ProfilePreviewResponse;
 import com.devsync.coding.enums.CodingPlatform;
 import com.devsync.coding.service.CodingProfileService;
 import com.devsync.coding.service.CodingStatisticsService;
@@ -46,6 +48,14 @@ public class CodingProfileController {
                 .map(PlatformMetadataResponse::from)
                 .toList();
         return ResponseEntity.ok(ApiResponse.success(platforms));
+    }
+
+    @PostMapping("/accounts/preview")
+    @Operation(summary = "Preview platform profile from URL", description = "Parses profile URL, detects platform, extracts username, and fetches live public profile preview without persisting")
+    public ResponseEntity<ApiResponse<ProfilePreviewResponse>> previewProfile(
+            @Valid @RequestBody ProfilePreviewRequest request) {
+        ProfilePreviewResponse response = codingProfileService.previewProfile(request.getProfileUrl());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/accounts")

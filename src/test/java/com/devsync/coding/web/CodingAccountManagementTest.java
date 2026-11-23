@@ -291,4 +291,100 @@ class CodingAccountManagementTest {
                 .andExpect(jsonPath("$.data[?(@.platform == 'CODECHEF')].syncSupported").value(hasItem(false)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'HACKERRANK')].syncSupported").value(hasItem(false)));
     }
+
+    // =========================================================================
+    // Step 6C: Profile URL Detection & Preview Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("POST /accounts/preview — Preview LeetCode profile without persisting account or snapshot")
+    void previewProfile_LeetCode_SuccessAndNoPersistence() throws Exception {
+        long initialAccountCount = platformAccountRepository.count();
+
+        mockMvc.perform(post("/api/v1/coding/accounts/preview")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"profileUrl\":\"https://leetcode.com/u/alice_preview/\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.platform", is("LEETCODE")))
+                .andExpect(jsonPath("$.data.username", is("alice_preview")))
+                .andExpect(jsonPath("$.data.canonicalProfileUrl", is("https://leetcode.com/u/alice_preview/")))
+                .andExpect(jsonPath("$.data.autoSyncSupported", is(true)))
+                .andExpect(jsonPath("$.data.alreadyConnected", is(false)));
+
+        // Verify INVARIANT: Preview must not persist account to database
+        assertEquals(initialAccountCount, platformAccountRepository.count());
+    }
+
+    @Test
+    @DisplayName("POST /accounts/preview — CodeChef preview communicates OAuth2 restriction without fabrication")
+    void previewProfile_CodeChef_CommunicatesRestrictions() throws Exception {
+        mockMvc.perform(post("/api/v1/coding/accounts/preview")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"profileUrl\":\"https://www.codechef.com/users/alice_cc\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.platform", is("CODECHEF")))
+                .andExpect(jsonPath("$.data.username", is("alice_cc")))
+                .andExpect(jsonPath("$.data.autoSyncSupported", is(false)))
+                .andExpect(jsonPath("$.data.capabilityNotice", containsString("OAuth2 credentials")));
+    }
+
+    @Test
+    @DisplayName("POST /accounts/preview — Rejects unsupported or malicious domains with 400 Bad Request")
+    void previewProfile_UnsupportedDomain_Rejects() throws Exception {
+        mockMvc.perform(post("/api/v1/coding/accounts/preview")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"profileUrl\":\"https://malicious-site.com/profile/hacker\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)))
+                .andExpect(jsonPath("$.message", containsString("Unsupported platform domain")));
+    }
+
+    @Test
+    @DisplayName("POST /accounts — Connect platform via profileUrl automatically detects platform and username")
+    void connectPlatform_ByProfileUrl_AutoDetectsAndConnects() throws Exception {
+        ConnectPlatformRequest request = new ConnectPlatformRequest("https://codeforces.com/profile/alice_auto");
+
+        mockMvc.perform(post("/api/v1/coding/accounts")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.platform", is("CODEFORCES")))
+                .andExpect(jsonPath("$.data.username", is("alice_auto")))
+                .andExpect(jsonPath("$.data.profileUrl", is("https://codeforces.com/profile/alice_auto")));
+
+        // Connecting same platform again triggers duplicate account defense
+        mockMvc.perform(post("/api/v1/coding/accounts")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("already exists for this user")));
+    }
+
+    @Test
+    @DisplayName("POST /accounts/preview — Reports alreadyConnected=true when user already has platform linked")
+    void previewProfile_AlreadyConnected_FlagsAccount() throws Exception {
+        platformAccountRepository.save(PlatformAccount.builder()
+                .user(alice)
+                .platform(CodingPlatform.GITHUB)
+                .username("alice-existing-gh")
+                .profileUrl("https://github.com/alice-existing-gh")
+                .active(true)
+                .syncStatus(SyncStatus.SUCCESS)
+                .build());
+
+        mockMvc.perform(post("/api/v1/coding/accounts/preview")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"profileUrl\":\"https://github.com/alice-existing-gh\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.alreadyConnected", is(true)));
+    }
 }

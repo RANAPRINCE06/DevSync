@@ -86,8 +86,44 @@ export interface CodingStatistics {
 }
 
 export interface ConnectPlatformRequest {
+  platform?: CodingPlatform;
+  username?: string;
+  profileUrl?: string;
+}
+
+export interface ProfilePreviewRequest {
+  profileUrl: string;
+}
+
+export interface PreviewMetrics {
+  problemsSolved: number | null;
+  easySolved: number | null;
+  mediumSolved: number | null;
+  hardSolved: number | null;
+  currentRating: number | null;
+  maximumRating: number | null;
+  globalRank: number | null;
+  platformRank: string | null;
+  contestsParticipated: number | null;
+  publicRepos: number | null;
+  totalStars: number | null;
+  followers: number | null;
+  additionalStats: Record<string, unknown> | null;
+}
+
+export interface ProfilePreviewResponse {
   platform: CodingPlatform;
+  platformDisplayName: string;
   username: string;
+  canonicalProfileUrl: string;
+  profileExists: boolean;
+  displayName: string | null;
+  avatarUrl: string | null;
+  autoSyncSupported: boolean;
+  capabilityNotice: string | null;
+  warning: string | null;
+  alreadyConnected: boolean;
+  metrics: PreviewMetrics | null;
 }
 
 export interface PlatformConfig {
