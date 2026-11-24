@@ -16,6 +16,7 @@ import com.devsync.coding.integration.exception.PlatformRateLimitException;
 import com.devsync.coding.integration.exception.PlatformUserNotFoundException;
 import com.devsync.coding.integration.registry.PlatformIntegrationRegistry;
 import com.devsync.coding.mapper.CodingProfileMapper;
+import com.devsync.coding.reliability.cache.PlatformProfileCache;
 import com.devsync.coding.repository.PlatformAccountRepository;
 import com.devsync.coding.repository.PlatformStatSnapshotRepository;
 import com.devsync.coding.service.url.PlatformUrlDetector;
@@ -26,6 +27,7 @@ import com.devsync.user.entity.User;
 import com.devsync.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -49,19 +51,22 @@ public class CodingProfileServiceImpl implements CodingProfileService {
     private final CurrentUserProvider currentUserProvider;
     private final PlatformSyncService platformSyncService;
     private final PlatformIntegrationRegistry platformIntegrationRegistry;
+    private final PlatformProfileCache platformProfileCache;
 
     public CodingProfileServiceImpl(PlatformAccountRepository platformAccountRepository,
             PlatformStatSnapshotRepository platformStatSnapshotRepository,
             UserRepository userRepository,
             CurrentUserProvider currentUserProvider,
             PlatformSyncService platformSyncService,
-            PlatformIntegrationRegistry platformIntegrationRegistry) {
+            PlatformIntegrationRegistry platformIntegrationRegistry,
+            PlatformProfileCache platformProfileCache) {
         this.platformAccountRepository = platformAccountRepository;
         this.platformStatSnapshotRepository = platformStatSnapshotRepository;
         this.userRepository = userRepository;
         this.currentUserProvider = currentUserProvider;
         this.platformSyncService = platformSyncService;
         this.platformIntegrationRegistry = platformIntegrationRegistry;
+        this.platformProfileCache = platformProfileCache;
     }
 
     @Override
@@ -104,6 +109,9 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                 CodingPlatformAdapter adapter = platformIntegrationRegistry.getRequiredAdapter(platform);
                 ExternalProfileData data = adapter.fetchProfileData(username);
                 if (data != null) {
+                    if (platformProfileCache != null && platformProfileCache.isEnabled()) {
+                        platformProfileCache.put(platform, username, data);
+                    }
                     Map<String, Object> additionalStats = data.getAdditionalStats();
                     if (additionalStats != null) {
                         Object dn = additionalStats.get("displayName");
@@ -225,11 +233,28 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                 .syncStatus(SyncStatus.NEVER_SYNCED)
                 .build();
 
-        PlatformAccount saved = platformAccountRepository.save(account);
-        return CodingProfileMapper.toResponse(saved, null);
+        PlatformAccount saved = platformAccountRepository.saveAndFlush(account);
+
+        PlatformStatSnapshot latestSnapshot = null;
+        if (platform.isAutomatedSyncSupported()) {
+            try {
+                platformSyncService.syncAccount(saved, "initial");
+                saved = platformAccountRepository.findById(saved.getId()).orElse(saved);
+                latestSnapshot = platformStatSnapshotRepository
+                        .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(saved.getId())
+                        .orElse(null);
+            } catch (Exception ex) {
+                log.warn("Initial synchronization failed for newly connected account [{}]: {}",
+                        saved.getId(), ex.getMessage());
+                saved = platformAccountRepository.findById(saved.getId()).orElse(saved);
+            }
+        }
+
+        return CodingProfileMapper.toResponse(saved, latestSnapshot);
     }
 
     @Override
+    @Transactional
     public List<PlatformAccountResponse> getConnectedAccounts() {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
         List<PlatformAccount> accounts = platformAccountRepository
@@ -239,9 +264,48 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                 .map(account -> {
                     Optional<PlatformStatSnapshot> latest = platformStatSnapshotRepository
                             .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
+                    if (latest.isEmpty() && account.getPlatform().isAutomatedSyncSupported()
+                            && account.getSyncStatus() == SyncStatus.NEVER_SYNCED) {
+                        try {
+                            platformSyncService.syncAccount(account, "initial");
+                            account = platformAccountRepository.findById(account.getId()).orElse(account);
+                            latest = platformStatSnapshotRepository
+                                    .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
+                        } catch (Exception ex) {
+                            log.warn("Recovery synchronization failed for account [{}]: {}", account.getId(), ex.getMessage());
+                        }
+                    }
                     return CodingProfileMapper.toResponse(account, latest.orElse(null));
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public List<PlatformAccountResponse> syncAllAccounts() {
+        UUID currentUserId = currentUserProvider.getCurrentUserId();
+        List<PlatformAccount> accounts = platformAccountRepository
+                .findAllByUserIdAndActiveTrueOrderByCreatedAtAsc(currentUserId);
+
+        java.util.ArrayList<PlatformAccountResponse> responses = new java.util.ArrayList<>();
+        for (PlatformAccount account : accounts) {
+            if (account.getPlatform().isAutomatedSyncSupported()) {
+                try {
+                    PlatformAccountResponse res = platformSyncService.syncAccountForUser(account.getId(), currentUserId);
+                    responses.add(res);
+                } catch (Exception ex) {
+                    log.warn("Failed to sync account [{}]: {}", account.getId(), ex.getMessage());
+                    Optional<PlatformStatSnapshot> latest = platformStatSnapshotRepository
+                            .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
+                    responses.add(CodingProfileMapper.toResponse(account, latest.orElse(null)));
+                }
+            } else {
+                Optional<PlatformStatSnapshot> latest = platformStatSnapshotRepository
+                        .findFirstByPlatformAccountIdOrderBySnapshotAtDesc(account.getId());
+                responses.add(CodingProfileMapper.toResponse(account, latest.orElse(null)));
+            }
+        }
+        return responses;
     }
 
     @Override

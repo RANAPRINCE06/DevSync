@@ -313,14 +313,16 @@ export const DashboardCodingOverview: React.FC = () => {
                     </span>
                     <span
                       className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
-                        account.syncStatus === 'SUCCESS'
+                        !meta.isAutomated
+                          ? 'bg-slate-800 text-slate-400'
+                          : account.syncStatus === 'SUCCESS'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : account.syncStatus === 'FAILED'
                           ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                           : 'bg-slate-800 text-slate-400'
                       }`}
                     >
-                      {account.syncStatus}
+                      {!meta.isAutomated ? 'LINKED' : account.syncStatus}
                     </span>
                   </div>
                   <a

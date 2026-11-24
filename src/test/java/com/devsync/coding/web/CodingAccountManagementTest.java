@@ -92,7 +92,7 @@ class CodingAccountManagementTest {
     }
 
     @Test
-    @DisplayName("Connect valid platform account — Returns 201 with generated profile URL and NEVER_SYNCED status")
+    @DisplayName("Connect valid platform account — Returns 201 with generated profile URL and triggers initial sync")
     void connectPlatform_ValidRequest_Success() throws Exception {
         ConnectPlatformRequest request = new ConnectPlatformRequest(CodingPlatform.LEETCODE, "alice_coder");
 
@@ -109,8 +109,7 @@ class CodingAccountManagementTest {
                 .andExpect(jsonPath("$.data.username", is("alice_coder")))
                 .andExpect(jsonPath("$.data.profileUrl", is("https://leetcode.com/u/alice_coder/")))
                 .andExpect(jsonPath("$.data.active", is(true)))
-                .andExpect(jsonPath("$.data.syncStatus", is("NEVER_SYNCED")))
-                .andExpect(jsonPath("$.data.lastSyncedAt", nullValue()));
+                .andExpect(jsonPath("$.data.syncStatus", anyOf(is("SUCCESS"), is("FAILED"), is("NEVER_SYNCED"))));
     }
 
     @Test
@@ -276,18 +275,20 @@ class CodingAccountManagementTest {
     }
 
     @Test
-    @DisplayName("Get supported platforms — Returns all 6 platforms with capability sets and metadata")
+    @DisplayName("Get supported platforms — Returns all 7 platforms with capability sets and metadata")
     void getSupportedPlatforms_ReturnsAllSixPlatforms() throws Exception {
         mockMvc.perform(get("/api/v1/coding/platforms")
                         .header("Authorization", "Bearer " + aliceToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
-                .andExpect(jsonPath("$.data", hasSize(6)))
+                .andExpect(jsonPath("$.data", hasSize(7)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'LEETCODE')].syncSupported").value(hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'CODEFORCES')].syncSupported").value(hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'GITHUB')].syncSupported").value(hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'ATCODER')].syncSupported").value(hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'ATCODER')].communityApi").value(hasItem(true)))
+                .andExpect(jsonPath("$.data[?(@.platform == 'GEEKSFORGEEKS')].syncSupported").value(hasItem(true)))
+                .andExpect(jsonPath("$.data[?(@.platform == 'GEEKSFORGEEKS')].communityApi").value(hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'CODECHEF')].syncSupported").value(hasItem(false)))
                 .andExpect(jsonPath("$.data[?(@.platform == 'HACKERRANK')].syncSupported").value(hasItem(false)));
     }

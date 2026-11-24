@@ -52,6 +52,14 @@ export const codingIntelligenceService = {
   },
 
   /**
+   * Triggers batch synchronization of all automatable platform accounts
+   */
+  async syncAllAccounts(): Promise<PlatformAccount[]> {
+    const response = await apiClient.post<ApiResponse<PlatformAccount[]>>('/coding/accounts/sync-all');
+    return response.data.data;
+  },
+
+  /**
    * Retrieves sync statuses for all connected platforms
    */
   async getSyncStatuses(): Promise<PlatformSyncStatus[]> {

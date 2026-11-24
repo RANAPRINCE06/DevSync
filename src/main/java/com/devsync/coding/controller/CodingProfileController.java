@@ -101,6 +101,13 @@ public class CodingProfileController {
         return ResponseEntity.ok(ApiResponse.success(message, response));
     }
 
+    @PostMapping("/accounts/sync-all")
+    @Operation(summary = "Synchronize all active platform accounts", description = "Trigger synchronization for all owned active platform accounts that support automated synchronization")
+    public ResponseEntity<ApiResponse<List<PlatformAccountResponse>>> syncAllAccounts() {
+        List<PlatformAccountResponse> response = codingProfileService.syncAllAccounts();
+        return ResponseEntity.ok(ApiResponse.success("Platform accounts synchronized successfully", response));
+    }
+
     @GetMapping("/statistics")
     @Operation(summary = "Get coding statistics", description = "Retrieve aggregated statistics across all connected platform accounts for the authenticated user")
     public ResponseEntity<ApiResponse<CodingStatisticsResponse>> getCodingStatistics() {

@@ -27,6 +27,7 @@ import {
   useDisconnectPlatform,
   useSyncPlatform,
   usePreviewCodingProfile,
+  useSyncAllPlatforms,
 } from '@/hooks/useCodingIntelligence';
 import { detectPlatformFromUrl } from '@/utils/platformUrlDetector';
 import { CodingPlatform, ProfilePreviewResponse } from '@/types/codingIntelligence';
@@ -53,6 +54,7 @@ export const CodingProfilesPage: React.FC = () => {
   const connectMutation = useConnectPlatform();
   const disconnectMutation = useDisconnectPlatform();
   const syncMutation = useSyncPlatform();
+  const syncAllMutation = useSyncAllPlatforms();
 
   // Real-time client-side URL detection
   const clientDetection = useMemo(() => {
@@ -381,6 +383,18 @@ export const CodingProfilesPage: React.FC = () => {
           <div className="flex items-center justify-between w-full">
             <CardTitle className="text-sm font-bold">Connected Platform Profiles</CardTitle>
             <div className="flex items-center gap-2">
+              {accounts.some((a) => a.platform !== 'CODECHEF' && a.platform !== 'HACKERRANK') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => syncAllMutation.mutate()}
+                  isLoading={syncAllMutation.isPending}
+                  leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncAllMutation.isPending ? 'animate-spin text-primary-500' : ''}`} />}
+                  className="text-xs h-7 px-2.5"
+                >
+                  Sync All
+                </Button>
+              )}
               {isRefetching && (
                 <span className="text-[11px] text-surface-400 flex items-center gap-1">
                   <RefreshCw className="w-3 h-3 animate-spin text-primary-500" /> Refreshing...
@@ -479,20 +493,24 @@ export const CodingProfilesPage: React.FC = () => {
                         <td className="py-3 px-3">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              acc.syncStatus === 'SUCCESS'
+                              !isAutomated
+                                ? 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                : acc.syncStatus === 'SUCCESS'
                                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                 : acc.syncStatus === 'FAILED'
                                 ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                : acc.syncStatus === 'PENDING'
+                                : acc.syncStatus === 'PENDING' || isSyncing
                                 ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
                                 : 'bg-surface-200 dark:bg-surface-800 text-surface-500'
                             }`}
                           >
-                            {acc.syncStatus}
+                            {isSyncing ? 'SYNCING...' : !isAutomated ? 'PROFILE_LINKED' : acc.syncStatus}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-surface-500 text-[11px] font-mono">
-                          {acc.lastSyncedAt
+                          {!isAutomated
+                            ? 'N/A (Link Only)'
+                            : acc.lastSyncedAt
                             ? new Date(acc.lastSyncedAt).toLocaleString(undefined, {
                                 month: 'short',
                                 day: 'numeric',

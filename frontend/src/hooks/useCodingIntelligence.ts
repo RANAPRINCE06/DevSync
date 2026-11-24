@@ -110,6 +110,23 @@ export const useSyncPlatform = () => {
   });
 };
 
+export const useSyncAllPlatforms = () => {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  return useMutation({
+    mutationFn: () => codingIntelligenceService.syncAllAccounts(),
+    onSuccess: (data) => {
+      const successCount = data.filter((a) => a.syncStatus === 'SUCCESS').length;
+      showToast('success', `Synchronized ${successCount} automated platform account(s)`);
+      queryClient.invalidateQueries({ queryKey: CODING_INTELLIGENCE_KEYS.all });
+    },
+    onError: (error: Error) => {
+      showToast('error', error.message || 'Failed to synchronize platform profiles');
+    },
+  });
+};
+
 export const useCodingAnalyticsOverview = () => {
   return useQuery({
     queryKey: CODING_INTELLIGENCE_KEYS.analyticsOverview(),

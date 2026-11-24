@@ -24,5 +24,7 @@ public interface CodingProfileService {
 
     PlatformAccountResponse syncAccount(UUID accountId);
 
+    List<PlatformAccountResponse> syncAllAccounts();
+
     Page<PlatformStatSnapshotResponse> getAccountHistory(UUID accountId, Pageable pageable);
 }

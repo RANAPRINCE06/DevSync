@@ -1,6 +1,8 @@
 package com.devsync.coding.web;
 
 import com.devsync.auth.security.JwtTokenProvider;
+import com.devsync.coding.dto.ConnectPlatformRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.devsync.coding.entity.PlatformAccount;
 import com.devsync.coding.entity.PlatformStatSnapshot;
 import com.devsync.coding.enums.CodingPlatform;
@@ -47,6 +49,9 @@ class CodingAccountSyncIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
@@ -306,5 +311,109 @@ class CodingAccountSyncIntegrationTest {
         mockMvc.perform(get("/api/v1/coding/accounts/" + aliceAccount.getId() + "/history")
                         .header("Authorization", "Bearer " + bobToken))
                 .andExpect(status().isNotFound());
+    }
+
+    // =========================================================================
+    // Account Linking Initial Sync & Persistence Pipeline Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("Connect platform — Automatically triggers initial sync and persists snapshot for automated platform")
+    void connectPlatform_AutomatedPlatform_TriggersInitialSyncAndPersistsSnapshot() throws Exception {
+        CodingPlatformAdapter adapter = org.mockito.Mockito.mock(CodingPlatformAdapter.class);
+        when(platformIntegrationRegistry.getRequiredAdapter(CodingPlatform.LEETCODE)).thenReturn(adapter);
+
+        ExternalProfileData mockData = ExternalProfileData.builder()
+                .platform(CodingPlatform.LEETCODE)
+                .username("neal_wu")
+                .profileUrl("https://leetcode.com/u/neal_wu/")
+                .currentRating(2850.0)
+                .maximumRating(2900.0)
+                .problemsSolved(1800)
+                .easySolved(500)
+                .mediumSolved(900)
+                .hardSolved(400)
+                .contestsParticipated(85)
+                .fetchedAt(Instant.now())
+                .build();
+
+        when(adapter.fetchProfileData("neal_wu")).thenReturn(mockData);
+
+        ConnectPlatformRequest request = new ConnectPlatformRequest(CodingPlatform.LEETCODE, "neal_wu");
+
+        mockMvc.perform(post("/api/v1/coding/accounts")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.syncStatus", is("SUCCESS")))
+                .andExpect(jsonPath("$.data.lastSyncedAt", notNullValue()))
+                .andExpect(jsonPath("$.data.latestSnapshot.currentRating", is(2850.0)))
+                .andExpect(jsonPath("$.data.latestSnapshot.problemsSolved", is(1800)));
+
+        // Verify snapshot in database
+        List<PlatformStatSnapshot> snapshots = platformStatSnapshotRepository.findAll();
+        assertEquals(1, snapshots.size());
+        assertEquals(2850.0, snapshots.getFirst().getCurrentRating());
+        assertEquals(1800, snapshots.getFirst().getProblemsSolved());
+
+        // Verify account retrieval returns persisted snapshot
+        mockMvc.perform(get("/api/v1/coding/accounts")
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].syncStatus", is("SUCCESS")))
+                .andExpect(jsonPath("$.data[0].latestSnapshot.currentRating", is(2850.0)))
+                .andExpect(jsonPath("$.data[0].latestSnapshot.problemsSolved", is(1800)));
+    }
+
+    @Test
+    @DisplayName("Connect platform — Profile-only platform (HackerRank) retains NEVER_SYNCED without faking sync")
+    void connectPlatform_ProfileOnlyPlatform_RetainsNeverSynced() throws Exception {
+        ConnectPlatformRequest request = new ConnectPlatformRequest(CodingPlatform.HACKERRANK, "alice_hr");
+
+        mockMvc.perform(post("/api/v1/coding/accounts")
+                        .header("Authorization", "Bearer " + aliceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.syncStatus", is("NEVER_SYNCED")))
+                .andExpect(jsonPath("$.data.latestSnapshot", nullValue()));
+
+        // Zero snapshots created
+        List<PlatformStatSnapshot> snapshots = platformStatSnapshotRepository.findAll();
+        assertTrue(snapshots.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Sync All — Synchronizes all active automatable accounts in one batch")
+    void syncAllAccounts_SyncsAllAutomatablePlatforms() throws Exception {
+        PlatformAccount lcAccount = platformAccountRepository.save(PlatformAccount.builder()
+                .user(alice)
+                .platform(CodingPlatform.LEETCODE)
+                .username("alice_sync_all")
+                .profileUrl("https://leetcode.com/u/alice_sync_all/")
+                .active(true)
+                .syncStatus(SyncStatus.NEVER_SYNCED)
+                .build());
+
+        CodingPlatformAdapter lcAdapter = org.mockito.Mockito.mock(CodingPlatformAdapter.class);
+        when(platformIntegrationRegistry.getRequiredAdapter(CodingPlatform.LEETCODE)).thenReturn(lcAdapter);
+        when(lcAdapter.fetchProfileData("alice_sync_all")).thenReturn(ExternalProfileData.builder()
+                .platform(CodingPlatform.LEETCODE)
+                .username("alice_sync_all")
+                .currentRating(2100.0)
+                .problemsSolved(500)
+                .fetchedAt(Instant.now())
+                .build());
+
+        mockMvc.perform(post("/api/v1/coding/accounts/sync-all")
+                        .header("Authorization", "Bearer " + aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].syncStatus", is("SUCCESS")))
+                .andExpect(jsonPath("$.data[0].latestSnapshot.currentRating", is(2100.0)));
     }
 }
