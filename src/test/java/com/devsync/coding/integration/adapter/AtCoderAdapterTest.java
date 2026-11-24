@@ -33,7 +33,9 @@ class AtCoderAdapterTest {
         properties = new CodingIntegrationProperties();
         properties.getAtcoder().setEnabled(true);
         properties.getAtcoder().setBaseUrl("https://kenkoooo.com/atcoder/atcoder-api/v3");
+        properties.getAtcoder().setRequestIntervalMs(0);
         adapter = new AtCoderAdapter(client, properties);
+        adapter.setMinRequestIntervalMs(0);
     }
 
     @Test
@@ -128,6 +130,8 @@ class AtCoderAdapterTest {
         assertEquals(4500L, data.getGlobalRank());
         assertNull(data.getAdditionalStats().get("ratedPointSum"));
         assertNull(data.getAdditionalStats().get("longestStreakDays"));
+        assertEquals(true, data.getAdditionalStats().get("partialData"));
+        assertEquals("PARTIAL", data.getAdditionalStats().get("secondaryDataStatus"));
     }
 
     @Test

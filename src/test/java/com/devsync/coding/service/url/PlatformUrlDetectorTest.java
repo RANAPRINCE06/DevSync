@@ -180,6 +180,42 @@ class PlatformUrlDetectorTest {
     }
 
     // =========================================================================
+    // GeeksforGeeks Tests
+    // =========================================================================
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://www.geeksforgeeks.org/user/tourist_dev/",
+            "https://www.geeksforgeeks.org/user/tourist_dev",
+            "https://geeksforgeeks.org/user/tourist_dev/",
+            "https://www.geeksforgeeks.org/profile/tourist_dev/",
+            "https://www.geeksforgeeks.org/user/tourist_dev/profile",
+            "https://auth.geeksforgeeks.org/user/tourist_dev/",
+            "geeksforgeeks.org/user/tourist_dev"
+    })
+    @DisplayName("GeeksforGeeks URL detection — Accurately extracts handle and produces canonical URL")
+    void detect_GeeksforGeeks_Success(String url) {
+        PlatformUrlDetector.DetectedProfileUrl result = PlatformUrlDetector.detect(url);
+        assertNotNull(result);
+        assertEquals(CodingPlatform.GEEKSFORGEEKS, result.platform());
+        assertEquals("tourist_dev", result.username());
+        assertEquals("https://www.geeksforgeeks.org/user/tourist_dev/", result.canonicalProfileUrl());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://www.geeksforgeeks.org/courses",
+            "https://www.geeksforgeeks.org/explore",
+            "https://www.geeksforgeeks.org/practice",
+            "https://www.geeksforgeeks.org/tutorials"
+    })
+    @DisplayName("GeeksforGeeks reserved path rejection — Rejects non-profile pages")
+    void detect_GeeksforGeeks_ReservedPaths_ThrowsBadRequest(String url) {
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> PlatformUrlDetector.detect(url));
+        assertTrue(ex.getMessage().contains("reserved platform path"));
+    }
+
+    // =========================================================================
     // Security & Error Rejection Tests
     // =========================================================================
 

@@ -51,11 +51,11 @@ public class CodingProfileServiceImpl implements CodingProfileService {
     private final PlatformIntegrationRegistry platformIntegrationRegistry;
 
     public CodingProfileServiceImpl(PlatformAccountRepository platformAccountRepository,
-                                    PlatformStatSnapshotRepository platformStatSnapshotRepository,
-                                    UserRepository userRepository,
-                                    CurrentUserProvider currentUserProvider,
-                                    PlatformSyncService platformSyncService,
-                                    PlatformIntegrationRegistry platformIntegrationRegistry) {
+            PlatformStatSnapshotRepository platformStatSnapshotRepository,
+            UserRepository userRepository,
+            CurrentUserProvider currentUserProvider,
+            PlatformSyncService platformSyncService,
+            PlatformIntegrationRegistry platformIntegrationRegistry) {
         this.platformAccountRepository = platformAccountRepository;
         this.platformStatSnapshotRepository = platformStatSnapshotRepository;
         this.userRepository = userRepository;
@@ -75,20 +75,24 @@ public class CodingProfileServiceImpl implements CodingProfileService {
         String canonicalUrl = detected.canonicalProfileUrl();
 
         // 2. Check if user already has an active account on this platform
-        boolean alreadyConnected = platformAccountRepository.existsByUserIdAndPlatformAndActiveTrue(currentUserId, platform);
+        boolean alreadyConnected = platformAccountRepository.existsByUserIdAndPlatformAndActiveTrue(currentUserId,
+                platform);
 
         // 3. Platform capability information
         boolean autoSync = platform.isAutomatedSyncSupported();
         String capabilityNotice = null;
         if (platform == CodingPlatform.ATCODER) {
             capabilityNotice = "Statistics provided by community Kenkoooo API. Contest rating not tracked.";
+        } else if (platform == CodingPlatform.GEEKSFORGEEKS) {
+            capabilityNotice = "Statistics provided by community GeeksforGeeks API. Contest rating not tracked.";
         } else if (platform == CodingPlatform.CODECHEF) {
             capabilityNotice = "Official automated synchronization requires OAuth2 credentials. Profile linking is supported.";
         } else if (platform == CodingPlatform.HACKERRANK) {
             capabilityNotice = "Automated synchronization is restricted to Enterprise assessment APIs (HackerRank for Work). Profile linking is supported.";
         }
 
-        // 4. Fetch live profile data if platform supports automated sync (without persisting anything)
+        // 4. Fetch live profile data if platform supports automated sync (without
+        // persisting anything)
         boolean profileExists = true;
         String warning = null;
         String displayName = null;
@@ -117,11 +121,14 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                     Integer followers = null;
                     if (platform == CodingPlatform.GITHUB && additionalStats != null) {
                         Object r = additionalStats.get("publicRepos");
-                        if (r instanceof Number n) publicRepos = n.intValue();
+                        if (r instanceof Number n)
+                            publicRepos = n.intValue();
                         Object s = additionalStats.get("totalStars");
-                        if (s instanceof Number n) totalStars = n.intValue();
+                        if (s instanceof Number n)
+                            totalStars = n.intValue();
                         Object f = additionalStats.get("followers");
-                        if (f instanceof Number n) followers = n.intValue();
+                        if (f instanceof Number n)
+                            followers = n.intValue();
                     }
 
                     metrics = new ProfilePreviewResponse.PreviewMetrics(
@@ -137,16 +144,18 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                             publicRepos,
                             totalStars,
                             followers,
-                            additionalStats
-                    );
+                            additionalStats);
                 }
             } catch (PlatformUserNotFoundException ex) {
                 profileExists = false;
-                warning = "Profile '@" + username + "' was not found on " + platform.getDisplayName() + ". Please check handle spelling.";
+                warning = "Profile '@" + username + "' was not found on " + platform.getDisplayName()
+                        + ". Please check handle spelling.";
             } catch (PlatformRateLimitException ex) {
-                warning = "External " + platform.getDisplayName() + " rate limit reached. Preview statistics temporarily unavailable.";
+                warning = "External " + platform.getDisplayName()
+                        + " rate limit reached. Preview statistics temporarily unavailable.";
             } catch (PlatformIntegrationException ex) {
-                warning = "Could not fetch preview statistics from " + platform.getDisplayName() + " (" + ex.getMessage() + "). Profile link can still be connected.";
+                warning = "Could not fetch preview statistics from " + platform.getDisplayName() + " ("
+                        + ex.getMessage() + "). Profile link can still be connected.";
             } catch (Exception ex) {
                 log.warn("Unexpected error previewing profile for {}@{}: {}", platform, username, ex.getMessage());
                 warning = "Could not reach " + platform.getDisplayName() + ". Profile link can still be connected.";
@@ -165,8 +174,7 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                 capabilityNotice,
                 warning,
                 alreadyConnected,
-                metrics
-        );
+                metrics);
     }
 
     @Override
@@ -177,7 +185,8 @@ public class CodingProfileServiceImpl implements CodingProfileService {
         String profileUrl = request.getProfileUrl();
 
         // Intelligent auto-detection from URL if platform or username omitted
-        if ((platform == null || username == null || username.trim().isEmpty()) && (profileUrl != null && !profileUrl.trim().isEmpty())) {
+        if ((platform == null || username == null || username.trim().isEmpty())
+                && (profileUrl != null && !profileUrl.trim().isEmpty())) {
             PlatformUrlDetector.DetectedProfileUrl detected = PlatformUrlDetector.detect(profileUrl);
             platform = detected.platform();
             username = detected.username();
@@ -199,7 +208,8 @@ public class CodingProfileServiceImpl implements CodingProfileService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + currentUserId));
 
         if (platformAccountRepository.existsByUserIdAndPlatformAndActiveTrue(currentUserId, platform)) {
-            throw new BadRequestException("An active account for platform " + platform + " already exists for this user.");
+            throw new BadRequestException(
+                    "An active account for platform " + platform + " already exists for this user.");
         }
 
         if (profileUrl == null || profileUrl.trim().isEmpty()) {
@@ -222,7 +232,8 @@ public class CodingProfileServiceImpl implements CodingProfileService {
     @Override
     public List<PlatformAccountResponse> getConnectedAccounts() {
         UUID currentUserId = currentUserProvider.getCurrentUserId();
-        List<PlatformAccount> accounts = platformAccountRepository.findAllByUserIdAndActiveTrueOrderByCreatedAtAsc(currentUserId);
+        List<PlatformAccount> accounts = platformAccountRepository
+                .findAllByUserIdAndActiveTrueOrderByCreatedAtAsc(currentUserId);
 
         return accounts.stream()
                 .map(account -> {

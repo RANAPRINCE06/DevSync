@@ -15,6 +15,7 @@ public class CodingIntegrationProperties {
     private PlatformConfig codechef = new PlatformConfig("https://api.codechef.com", false);
     private PlatformConfig hackerrank = new PlatformConfig("https://www.hackerrank.com/api", false);
     private PlatformConfig atcoder = new PlatformConfig("https://kenkoooo.com/atcoder/atcoder-api/v3", true);
+    private PlatformConfig geeksforgeeks = new PlatformConfig("https://geeks-for-geeks-api.vercel.app", true);
 
     public int getConnectTimeoutMs() {
         return connectTimeoutMs;
@@ -80,12 +81,21 @@ public class CodingIntegrationProperties {
         this.atcoder = atcoder;
     }
 
+    public PlatformConfig getGeeksforgeeks() {
+        return geeksforgeeks;
+    }
+
+    public void setGeeksforgeeks(PlatformConfig geeksforgeeks) {
+        this.geeksforgeeks = geeksforgeeks;
+    }
+
     public static class PlatformConfig {
         private String baseUrl;
         private boolean enabled;
         private String clientId;
         private String clientSecret;
         private String apiToken;
+        private long requestIntervalMs = 1050;
 
         public PlatformConfig() {
         }
@@ -93,6 +103,14 @@ public class CodingIntegrationProperties {
         public PlatformConfig(String baseUrl, boolean enabled) {
             this.baseUrl = baseUrl;
             this.enabled = enabled;
+        }
+
+        public long getRequestIntervalMs() {
+            return requestIntervalMs;
+        }
+
+        public void setRequestIntervalMs(long requestIntervalMs) {
+            this.requestIntervalMs = requestIntervalMs;
         }
 
         public String getBaseUrl() {

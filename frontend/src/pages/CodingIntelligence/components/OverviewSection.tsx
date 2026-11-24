@@ -40,7 +40,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   }
 
   const activeAutoSyncAccounts = accounts.filter(
-    (a) => a.active && (a.platform === 'LEETCODE' || a.platform === 'CODEFORCES' || a.platform === 'GITHUB' || a.platform === 'ATCODER')
+    (a) => a.active && (a.platform === 'LEETCODE' || a.platform === 'CODEFORCES' || a.platform === 'GITHUB' || a.platform === 'ATCODER' || a.platform === 'GEEKSFORGEEKS')
   );
 
   const syncHealth = overview?.syncHealthStatus || 'NORMAL';
@@ -88,7 +88,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             {overview?.totalProblemsSolved ?? '—'}
             <span className="text-xs font-normal text-surface-400">problems</span>
           </div>
-          <p className="text-[11px] text-surface-500 mt-1.5" title="Aggregated from LeetCode, Codeforces, and AtCoder snapshots">
+          <p className="text-[11px] text-surface-500 mt-1.5" title="Aggregated from LeetCode, Codeforces, AtCoder, and GeeksforGeeks snapshots">
             Sum of platform-reported solutions across active accounts
           </p>
         </div>

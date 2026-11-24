@@ -55,12 +55,22 @@ public final class PlatformUrlDetector {
             "auth", "signup", "certificates", "support", "scoring", "faq"
     );
 
+    private static final Set<String> GEEKSFORGEEKS_RESERVED = Set.of(
+            "explore", "courses", "jobs", "practice", "tutorials", "batch",
+            "contest", "events", "login", "register", "settings", "account",
+            "terms", "privacy", "contact", "about", "write", "contribute",
+            "category", "tag", "search"
+    );
+
+    private static final Set<String> ATCODER_SUBPAGES = Set.of("history", "submissions", "contests", "custom_test");
+
     private static final Pattern LEETCODE_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{3,30}$");
     private static final Pattern CODEFORCES_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_.-]{3,24}$");
     private static final Pattern GITHUB_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$");
     private static final Pattern ATCODER_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]{3,16}$");
     private static final Pattern CODECHEF_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
     private static final Pattern HACKERRANK_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
+    private static final Pattern GEEKSFORGEEKS_USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_.-]{3,50}$");
 
     private PlatformUrlDetector() {
     }
@@ -133,8 +143,9 @@ public final class PlatformUrlDetector {
             case "atcoder.jp" -> parseAtCoder(segments);
             case "codechef.com" -> parseCodeChef(segments);
             case "hackerrank.com" -> parseHackerRank(segments);
+            case "geeksforgeeks.org", "auth.geeksforgeeks.org" -> parseGeeksforGeeks(segments);
             default -> throw new BadRequestException(
-                    "Unsupported platform domain: '" + host + "'. Supported platforms: LeetCode, Codeforces, GitHub, AtCoder, CodeChef, HackerRank."
+                    "Unsupported platform domain: '" + host + "'. Supported platforms: LeetCode, Codeforces, GitHub, AtCoder, CodeChef, HackerRank, GeeksforGeeks."
             );
         };
     }
@@ -192,7 +203,8 @@ public final class PlatformUrlDetector {
     }
 
     private static DetectedProfileUrl parseAtCoder(List<String> segments) {
-        if (segments.size() != 2 || !segments.getFirst().equalsIgnoreCase("users")) {
+        if (!segments.getFirst().equalsIgnoreCase("users") ||
+                (segments.size() != 2 && !(segments.size() == 3 && ATCODER_SUBPAGES.contains(segments.get(2).toLowerCase())))) {
             throw new BadRequestException("Invalid AtCoder profile URL structure. Expected: https://atcoder.jp/users/{username}");
         }
 
@@ -236,5 +248,36 @@ public final class PlatformUrlDetector {
         }
 
         return new DetectedProfileUrl(CodingPlatform.HACKERRANK, username, CodingPlatform.HACKERRANK.buildProfileUrl(username));
+    }
+
+    private static DetectedProfileUrl parseGeeksforGeeks(List<String> segments) {
+        String first = segments.getFirst();
+        String username;
+
+        if (segments.size() >= 2 && (first.equalsIgnoreCase("user") || first.equalsIgnoreCase("profile"))) {
+            username = segments.get(1);
+            if (segments.size() == 3 && !segments.get(2).equalsIgnoreCase("profile")) {
+                throw new BadRequestException("Invalid GeeksforGeeks profile URL structure. Expected: https://www.geeksforgeeks.org/user/{username}/");
+            } else if (segments.size() > 3) {
+                throw new BadRequestException("Invalid GeeksforGeeks profile URL structure. Expected: https://www.geeksforgeeks.org/user/{username}/");
+            }
+        } else if (segments.size() == 1) {
+            if (GEEKSFORGEEKS_RESERVED.contains(first.toLowerCase())) {
+                throw new BadRequestException("Invalid GeeksforGeeks profile URL: '" + first + "' is a reserved platform path");
+            }
+            username = first;
+        } else {
+            throw new BadRequestException("Invalid GeeksforGeeks profile URL structure. Expected: https://www.geeksforgeeks.org/user/{username}/");
+        }
+
+        if (GEEKSFORGEEKS_RESERVED.contains(username.toLowerCase())) {
+            throw new BadRequestException("Invalid GeeksforGeeks profile URL: '" + username + "' is a reserved platform path");
+        }
+
+        if (!GEEKSFORGEEKS_USERNAME_PATTERN.matcher(username).matches()) {
+            throw new BadRequestException("Invalid GeeksforGeeks username format extracted from URL: '" + username + "'");
+        }
+
+        return new DetectedProfileUrl(CodingPlatform.GEEKSFORGEEKS, username, CodingPlatform.GEEKSFORGEEKS.buildProfileUrl(username));
     }
 }

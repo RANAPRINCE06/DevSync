@@ -307,6 +307,34 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
                     </span>
                   </div>
                 )}
+
+                {/* GeeksforGeeks Community Metrics */}
+                {account.platform === 'GEEKSFORGEEKS' && additional?.codingScore != null && (
+                  <div>
+                    <span className="text-[10px] text-surface-400 block font-medium">Coding Score</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {Number(additional.codingScore).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+
+                {account.platform === 'GEEKSFORGEEKS' && additional?.instituteRank != null && (
+                  <div>
+                    <span className="text-[10px] text-surface-400 block font-medium">Institute Rank</span>
+                    <span className="font-bold text-surface-900 dark:text-surface-100">
+                      #{String(additional.instituteRank)}
+                    </span>
+                  </div>
+                )}
+
+                {account.platform === 'GEEKSFORGEEKS' && (additional?.currentStreak != null || additional?.maxStreak != null) && (
+                  <div>
+                    <span className="text-[10px] text-surface-400 block font-medium">Streak (Curr / Max)</span>
+                    <span className="font-bold text-surface-900 dark:text-surface-100">
+                      {additional?.currentStreak != null ? String(additional.currentStreak) : '0'} / {additional?.maxStreak != null ? String(additional.maxStreak) : '0'}d
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

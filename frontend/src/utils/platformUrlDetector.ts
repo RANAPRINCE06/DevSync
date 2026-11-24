@@ -31,12 +31,20 @@ const HACKERRANK_RESERVED = new Set([
   'auth', 'signup', 'certificates', 'support', 'scoring', 'faq'
 ]);
 
+const GEEKSFORGEEKS_RESERVED = new Set([
+  'explore', 'courses', 'jobs', 'practice', 'tutorials', 'batch',
+  'contest', 'events', 'login', 'register', 'settings', 'account',
+  'terms', 'privacy', 'contact', 'about', 'write', 'contribute',
+  'category', 'tag', 'search'
+]);
+
 const LEETCODE_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 const CODEFORCES_REGEX = /^[a-zA-Z0-9_.-]{3,24}$/;
 const GITHUB_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
 const ATCODER_REGEX = /^[a-zA-Z0-9_]{3,16}$/;
 const CODECHEF_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 const HACKERRANK_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
+const GEEKSFORGEEKS_REGEX = /^[a-zA-Z0-9_.-]{3,50}$/;
 
 /**
  * Parses user input to detect coding platform and extract clean username on the client.
@@ -244,6 +252,76 @@ export function detectPlatformFromUrl(input: string): ClientDetectedUrl | null {
         canonicalProfileUrl: `https://www.hackerrank.com/profile/${username}`,
         isValid,
         errorMessage: isValid ? undefined : 'HackerRank username must be 3-30 characters',
+      };
+    }
+
+    case 'geeksforgeeks.org':
+    case 'auth.geeksforgeeks.org': {
+      const first = rawSegments[0];
+      let username = '';
+      if (rawSegments.length >= 2 && (first.toLowerCase() === 'user' || first.toLowerCase() === 'profile')) {
+        username = rawSegments[1];
+        if (rawSegments.length === 3 && rawSegments[2].toLowerCase() !== 'profile') {
+          return {
+            platform: 'GEEKSFORGEEKS',
+            platformDisplayName: 'GeeksforGeeks',
+            username: '',
+            canonicalProfileUrl: '',
+            isValid: false,
+            errorMessage: 'Expected structure: https://www.geeksforgeeks.org/user/{username}/',
+          };
+        } else if (rawSegments.length > 3) {
+          return {
+            platform: 'GEEKSFORGEEKS',
+            platformDisplayName: 'GeeksforGeeks',
+            username: '',
+            canonicalProfileUrl: '',
+            isValid: false,
+            errorMessage: 'Expected structure: https://www.geeksforgeeks.org/user/{username}/',
+          };
+        }
+      } else if (rawSegments.length === 1) {
+        if (GEEKSFORGEEKS_RESERVED.has(first.toLowerCase())) {
+          return {
+            platform: 'GEEKSFORGEEKS',
+            platformDisplayName: 'GeeksforGeeks',
+            username: '',
+            canonicalProfileUrl: '',
+            isValid: false,
+            errorMessage: `'${first}' is a platform-reserved path, not a user profile`,
+          };
+        }
+        username = first;
+      } else {
+        return {
+          platform: 'GEEKSFORGEEKS',
+          platformDisplayName: 'GeeksforGeeks',
+          username: '',
+          canonicalProfileUrl: '',
+          isValid: false,
+          errorMessage: 'Expected structure: https://www.geeksforgeeks.org/user/{username}/',
+        };
+      }
+
+      if (GEEKSFORGEEKS_RESERVED.has(username.toLowerCase())) {
+        return {
+          platform: 'GEEKSFORGEEKS',
+          platformDisplayName: 'GeeksforGeeks',
+          username: '',
+          canonicalProfileUrl: '',
+          isValid: false,
+          errorMessage: `'${username}' is a platform-reserved path, not a user profile`,
+        };
+      }
+
+      const isValid = GEEKSFORGEEKS_REGEX.test(username);
+      return {
+        platform: 'GEEKSFORGEEKS',
+        platformDisplayName: 'GeeksforGeeks',
+        username,
+        canonicalProfileUrl: `https://www.geeksforgeeks.org/user/${username}/`,
+        isValid,
+        errorMessage: isValid ? undefined : 'GeeksforGeeks username must be 3-50 alphanumeric characters or underscores/hyphens',
       };
     }
 

@@ -20,11 +20,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Adapter integrating AtCoder competitive programming platform via the community-backed
+ * Adapter integrating AtCoder competitive programming platform via the
+ * community-backed
  * AtCoder Problems API (https://kenkoooo.com/atcoder/atcoder-api/v3).
  *
  * In accordance with DevSync reliability and legal integrity specifications:
- * - Direct scraping of atcoder.jp is strictly avoided to comply with terms of service.
+ * - Direct scraping of atcoder.jp is strictly avoided to comply with terms of
+ * service.
  * - Sourced metrics are labeled as community data.
  * - Solved problem counts, rated point sum, and problem streaks are tracked.
  * - Contest ratings and difficulty tiers remain null rather than fabricated.
@@ -33,10 +35,13 @@ import java.util.Map;
 public class AtCoderAdapter implements CodingPlatformAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(AtCoderAdapter.class);
+    private static final Object THROTTLE_LOCK = new Object();
+    private static volatile long lastRequestTimestampMs = 0;
 
     private final CodingPlatformClient client;
     private final String baseUrl;
     private final boolean enabled;
+    private long minRequestIntervalMs = 1050; // Respect Kenkoooo API request spacing (> 1 second)
 
     public AtCoderAdapter(CodingIntegrationProperties properties) {
         this(null, properties);
@@ -47,6 +52,33 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
         this.client = client;
         this.baseUrl = properties.getAtcoder().getBaseUrl();
         this.enabled = properties.getAtcoder().isEnabled();
+        if (properties.getAtcoder() != null && properties.getAtcoder().getRequestIntervalMs() >= 0) {
+            this.minRequestIntervalMs = properties.getAtcoder().getRequestIntervalMs();
+        }
+    }
+
+    void setMinRequestIntervalMs(long minRequestIntervalMs) {
+        this.minRequestIntervalMs = minRequestIntervalMs;
+    }
+
+    private void throttleRequest() {
+        if (minRequestIntervalMs <= 0) {
+            return;
+        }
+        synchronized (THROTTLE_LOCK) {
+            long now = System.currentTimeMillis();
+            long elapsed = now - lastRequestTimestampMs;
+            if (elapsed < minRequestIntervalMs) {
+                long sleepTime = minRequestIntervalMs - elapsed;
+                try {
+                    Thread.sleep(sleepTime);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new PlatformIntegrationException("AtCoder request throttling interrupted", e);
+                }
+            }
+            lastRequestTimestampMs = System.currentTimeMillis();
+        }
     }
 
     @Override
@@ -70,6 +102,7 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
         }
 
         // 1. Fetch User Accepted Problems Count and AC Rank
+        throttleRequest();
         String acUrl = baseUrl + "/user/ac_rank?user=" + username;
         AtCoderRankResponse acResponse;
         try {
@@ -77,10 +110,11 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
         } catch (PlatformUserNotFoundException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new PlatformIntegrationException("Failed to fetch AtCoder statistics for user: " + username + " - " + ex.getMessage(), ex);
+            throw new PlatformIntegrationException(
+                    "Failed to fetch AtCoder statistics for user: " + username + " - " + ex.getMessage(), ex);
         }
 
-        if (acResponse == null) {
+        if (acResponse == null || (acResponse.getCount() == null && acResponse.getRank() == null)) {
             throw new PlatformUserNotFoundException("AtCoder user not found or empty profile: " + username);
         }
 
@@ -91,8 +125,11 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
         additionalStats.put("dataSource", "AtCoder Problems Community API (kenkoooo.com)");
         additionalStats.put("communityAcRank", acRank);
 
+        boolean secondaryFailed = false;
+
         // 2. Fetch Rated Point Sum Rank (optional/non-fatal)
         try {
+            throttleRequest();
             String pointUrl = baseUrl + "/user/rated_point_sum_rank?user=" + username;
             AtCoderRankResponse pointResponse = client.get(pointUrl, AtCoderRankResponse.class, null);
             if (pointResponse != null) {
@@ -104,11 +141,13 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
                 }
             }
         } catch (Exception ex) {
+            secondaryFailed = true;
             log.debug("Could not fetch AtCoder rated point sum for user {}: {}", username, ex.getMessage());
         }
 
         // 3. Fetch Streak Rank (optional/non-fatal)
         try {
+            throttleRequest();
             String streakUrl = baseUrl + "/user/streak_rank?user=" + username;
             AtCoderRankResponse streakResponse = client.get(streakUrl, AtCoderRankResponse.class, null);
             if (streakResponse != null) {
@@ -120,14 +159,24 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
                 }
             }
         } catch (Exception ex) {
+            secondaryFailed = true;
             log.debug("Could not fetch AtCoder streak stats for user {}: {}", username, ex.getMessage());
+        }
+
+        if (secondaryFailed) {
+            additionalStats.put("partialData", true);
+            additionalStats.put("secondaryDataStatus", "PARTIAL");
+        } else {
+            additionalStats.put("partialData", false);
+            additionalStats.put("secondaryDataStatus", "COMPLETE");
         }
 
         return new ExternalProfileData(
                 CodingPlatform.ATCODER,
                 username,
                 CodingPlatform.ATCODER.buildProfileUrl(username),
-                null, // currentRating remains null (not available via community AC API without HTML scraping)
+                null, // currentRating remains null (not available via community AC API without HTML
+                      // scraping)
                 null, // maximumRating
                 acRank, // globalRank mapped to community AC rank
                 null, // countryRank
@@ -138,8 +187,7 @@ public class AtCoderAdapter implements CodingPlatformAdapter {
                 null, // contestsParticipated
                 null, // platformRank
                 additionalStats,
-                Instant.now()
-        );
+                Instant.now());
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -126,7 +126,7 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
                     <td key={acc.id} className="py-3 px-4">
                       {cfg.communityApi ? (
                         <span className="text-[11px] font-medium text-sky-600 dark:text-sky-400">
-                          Community API (AtCoder Problems)
+                          Community API ({acc.platform === 'ATCODER' ? 'AtCoder Problems' : 'GFG API'})
                         </span>
                       ) : cfg.syncSupported ? (
                         <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -180,10 +180,10 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
                 </td>
                 {comparedAccounts.map((acc) => {
                   const snap = acc.latestSnapshot;
-                  if (acc.platform === 'GITHUB' || acc.platform === 'ATCODER') {
+                  if (acc.platform === 'GITHUB' || acc.platform === 'ATCODER' || acc.platform === 'GEEKSFORGEEKS') {
                     return (
                       <td key={acc.id} className="py-3 px-4 text-surface-400 italic">
-                        {acc.platform === 'ATCODER' ? 'Not exposed in Community API' : 'Not Applicable'}
+                        {acc.platform === 'GITHUB' ? 'Not Applicable' : 'Not exposed in Community API'}
                       </td>
                     );
                   }
@@ -215,7 +215,7 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
                 </td>
                 {comparedAccounts.map((acc) => {
                   const snap = acc.latestSnapshot;
-                  if (acc.platform === 'GITHUB' || acc.platform === 'ATCODER') {
+                  if (acc.platform === 'GITHUB' || acc.platform === 'ATCODER' || acc.platform === 'GEEKSFORGEEKS') {
                     return (
                       <td key={acc.id} className="py-3 px-4 text-surface-400 italic">
                         Not Applicable

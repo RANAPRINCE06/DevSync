@@ -37,6 +37,7 @@ export const SyncHealthCenter: React.FC<SyncHealthCenterProps> = ({
     GITHUB: { capacity: 10, refillRate: '0.5 req/sec', description: 'Official GitHub REST API' },
     LEETCODE: { capacity: 5, refillRate: '0.2 req/sec', description: 'Public GraphQL endpoint' },
     ATCODER: { capacity: 1, refillRate: '1.0 req/sec', description: 'Community API safe throttle' },
+    GEEKSFORGEEKS: { capacity: 3, refillRate: '0.5 req/sec', description: 'Community API safe throttle' },
     CODECHEF: { capacity: 1, refillRate: '0.1 req/sec', description: 'Requires OAuth2 Partner' },
     HACKERRANK: { capacity: 5, refillRate: '0.5 req/sec', description: 'Enterprise Auth only' },
   };

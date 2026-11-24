@@ -4,7 +4,8 @@ export type CodingPlatform =
   | 'CODECHEF'
   | 'HACKERRANK'
   | 'GITHUB'
-  | 'ATCODER';
+  | 'ATCODER'
+  | 'GEEKSFORGEEKS';
 
 export type PlatformCapability =
   | 'PROFILE_LINK_SUPPORTED'
@@ -154,6 +155,7 @@ export interface PlatformMetadata {
   communityApi: boolean;
   capabilities: PlatformCapability[];
   syncNote: string;
+  integrationStatus?: string;
 }
 
 export interface AnalyticsQueryParams {

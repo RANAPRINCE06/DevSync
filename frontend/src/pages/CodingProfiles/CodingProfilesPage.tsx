@@ -36,6 +36,7 @@ const EXAMPLE_URLS: { label: string; url: string; platform: CodingPlatform }[] =
   { label: 'Codeforces', url: 'https://codeforces.com/profile/tourist', platform: 'CODEFORCES' },
   { label: 'GitHub', url: 'https://github.com/torvalds', platform: 'GITHUB' },
   { label: 'AtCoder', url: 'https://atcoder.jp/users/chokudai', platform: 'ATCODER' },
+  { label: 'GeeksforGeeks', url: 'https://www.geeksforgeeks.org/user/tourist_dev/', platform: 'GEEKSFORGEEKS' },
   { label: 'CodeChef', url: 'https://www.codechef.com/users/gennady', platform: 'CODECHEF' },
   { label: 'HackerRank', url: 'https://www.hackerrank.com/profile/alicedev', platform: 'HACKERRANK' },
 ];
@@ -143,7 +144,7 @@ export const CodingProfilesPage: React.FC = () => {
               Connect via Public Profile URL
             </CardTitle>
             <span className="text-[11px] text-slate-400">
-              Auto-detects LeetCode, Codeforces, GitHub, AtCoder, CodeChef, HackerRank
+              Auto-detects LeetCode, Codeforces, GitHub, AtCoder, CodeChef, HackerRank, GeeksforGeeks
             </span>
           </div>
         </CardHeader>
@@ -431,7 +432,7 @@ export const CodingProfilesPage: React.FC = () => {
                             <Badge variant="primary" size="sm">
                               {acc.platformDisplayName || acc.platform}
                             </Badge>
-                            {acc.platform === 'ATCODER' && (
+                            {(acc.platform === 'ATCODER' || acc.platform === 'GEEKSFORGEEKS') && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-medium">
                                 Community
                               </span>

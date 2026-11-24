@@ -39,7 +39,7 @@ import { SyncHealthCenter } from './components/SyncHealthCenter';
 import { ConnectAccountModal } from './components/ConnectAccountModal';
 import { HistoricalStatsChart } from './HistoricalStatsChart';
 
-const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
+export const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
   LEETCODE: {
     name: 'LeetCode',
     displayName: 'LeetCode',
@@ -123,6 +123,21 @@ const PLATFORM_CONFIGS: Record<CodingPlatform, PlatformConfig> = {
     syncSupported: true,
     communityApi: true,
     syncNote: 'Synchronized via community AtCoder Problems API (kenkoooo.com). Solved problems, rated point sum, and streaks are tracked.',
+  },
+  GEEKSFORGEEKS: {
+    name: 'GeeksforGeeks',
+    displayName: 'GeeksforGeeks',
+    platform: 'GEEKSFORGEEKS',
+    urlPrefix: 'https://www.geeksforgeeks.org/user/',
+    iconName: 'GeeksforGeeks',
+    color: '#2F8D46',
+    bgLight: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    description: 'Coding score, problem difficulties, streaks & institute rank',
+    usernameRegex: /^[a-zA-Z0-9_.-]{3,50}$/,
+    usernamePlaceholder: 'e.g. gfg_coder',
+    syncSupported: true,
+    communityApi: true,
+    syncNote: 'Synchronized via community GeeksforGeeks API. Tracks coding score, solved problems by difficulty (School, Basic, Easy, Medium, Hard), streaks, and institute rank.',
   },
 };
 

@@ -26,6 +26,7 @@ import { filterRealUsers } from '@/lib/userFilter';
 import { Goal } from '@/types/goal';
 import { Task } from '@/types/task';
 import { DailyProgress } from '@/types/progress';
+import { DashboardCodingOverview } from './components/DashboardCodingOverview';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -409,6 +410,9 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* 4. CODING PERFORMANCE OVERVIEW (Step 6E Unified Integration) */}
+      <DashboardCodingOverview />
 
       {/* Quick Log Progress Modal */}
       <Modal

@@ -72,6 +72,18 @@ public enum CodingPlatform {
                     PlatformCapability.COMMUNITY_API_SUPPORTED,
                     PlatformCapability.PROBLEM_COUNTS_SUPPORTED
             )
+    ),
+    GEEKSFORGEEKS(
+            "GeeksforGeeks",
+            "https://www.geeksforgeeks.org/user/",
+            true,
+            EnumSet.of(
+                    PlatformCapability.PROFILE_LINK_SUPPORTED,
+                    PlatformCapability.AUTOMATED_SYNC_SUPPORTED,
+                    PlatformCapability.COMMUNITY_API_SUPPORTED,
+                    PlatformCapability.PROBLEM_COUNTS_SUPPORTED,
+                    PlatformCapability.DIFFICULTY_BREAKDOWN_SUPPORTED
+            )
     );
 
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_.-]{1,100}$");
@@ -128,7 +140,7 @@ public enum CodingPlatform {
         }
         String cleanUsername = username.trim();
         return switch (this) {
-            case LEETCODE -> profileUrlBase + cleanUsername + "/";
+            case LEETCODE, GEEKSFORGEEKS -> profileUrlBase + cleanUsername + "/";
             default -> profileUrlBase + cleanUsername;
         };
     }

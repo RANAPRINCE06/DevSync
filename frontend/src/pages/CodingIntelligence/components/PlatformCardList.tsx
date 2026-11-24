@@ -34,6 +34,7 @@ export const PlatformCardList: React.FC<PlatformCardListProps> = ({
     'CODEFORCES',
     'GITHUB',
     'ATCODER',
+    'GEEKSFORGEEKS',
     'CODECHEF',
     'HACKERRANK',
   ];

@@ -1,5 +1,5 @@
-import React from 'react';
-import { BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart3, Code2, Activity } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -12,8 +12,10 @@ import { useUserTotalPoints } from '@/hooks/useAchievements';
 import { DailyProgress } from '@/types/progress';
 import { Goal } from '@/types/goal';
 import { Task } from '@/types/task';
+import { CodingIntelligenceAnalytics } from './components/CodingIntelligenceAnalytics';
 
 export const AnalyticsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'productivity' | 'coding'>('productivity');
   const { user } = useAuth();
   const { activeTeam } = useApp();
 
@@ -78,19 +80,53 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* 1. Header */}
-      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs">
-        <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-blue-600" />
-          Productivity & Velocity Analytics
-        </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Comprehensive execution telemetry, focus heatmaps, and learning efficiency metrics
-        </p>
+      {/* 1. Header with View Tabs */}
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" />
+            Unified Analytics & Intelligence Hub
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Cross-platform telemetry, competitive programming intelligence, and execution velocity
+          </p>
+        </div>
+
+        {/* Primary Tab Switcher */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-[3px] border border-slate-200 dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => setActiveTab('productivity')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] text-xs font-semibold transition-colors ${
+              activeTab === 'productivity'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Productivity & Velocity
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('coding')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] text-xs font-semibold transition-colors ${
+              activeTab === 'coding'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5 text-indigo-500" />
+            Coding Intelligence (7 Platforms)
+          </button>
+        </div>
       </div>
 
-      {/* 2. Key Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {activeTab === 'coding' ? (
+        <CodingIntelligenceAnalytics />
+      ) : (
+        <>
+          {/* 2. Key Metrics Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3 rounded-[3px]">
           <span className="text-[11px] font-bold uppercase text-slate-500 block">Total Focus Time</span>
           <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
@@ -230,6 +266,8 @@ export const AnalyticsPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
     </div>
   );
 };

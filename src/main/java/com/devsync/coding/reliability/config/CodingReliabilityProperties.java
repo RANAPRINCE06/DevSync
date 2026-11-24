@@ -52,8 +52,9 @@ public class CodingReliabilityProperties {
             platforms.put(CodingPlatform.GITHUB, new PlatformLimit(10, 0.5));
             platforms.put(CodingPlatform.LEETCODE, new PlatformLimit(5, 0.2));
             platforms.put(CodingPlatform.HACKERRANK, new PlatformLimit(5, 0.5));
-            platforms.put(CodingPlatform.ATCODER, new PlatformLimit(5, 0.5));
+            platforms.put(CodingPlatform.ATCODER, new PlatformLimit(1, 0.9));
             platforms.put(CodingPlatform.CODECHEF, new PlatformLimit(1, 0.1));
+            platforms.put(CodingPlatform.GEEKSFORGEEKS, new PlatformLimit(3, 0.5));
         }
 
         public boolean isEnabled() {
