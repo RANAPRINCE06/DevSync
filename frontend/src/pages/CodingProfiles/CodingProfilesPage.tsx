@@ -108,37 +108,41 @@ export const CodingProfilesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* 1. Page Header */}
-      <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 p-4 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-base font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
-            <Code2 className="w-5 h-5 text-primary-600" />
-            Competitive Coding Accounts & Profiles
-          </h1>
-          <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-            Connect public profiles by pasting your profile URL. Powered by live platform integrations.
-          </p>
+      <div className="bg-gradient-to-r from-slate-900/90 via-indigo-950/60 to-slate-900/90 border border-indigo-500/30 p-4 rounded-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 shadow-inner">
+            <Code2 className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              Competitive Coding Accounts & Profiles
+            </h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Connect public profiles by pasting your profile URL. Powered by live platform integrations.
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <Badge variant="primary" size="md">
+          <span className="px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-semibold">
             {accounts.length} Connected
-          </Badge>
-          <span className="text-surface-400">|</span>
-          <span className="text-surface-500 font-mono text-[11px]">
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-400 font-mono text-[11px]">
             {accounts.filter((a) => a.syncStatus === 'SUCCESS').length} Auto-Synced
           </span>
         </div>
       </div>
 
       {/* 2. Intelligent URL Connection Hero Card */}
-      <Card className="border-primary-500/20 shadow-md">
-        <CardHeader className="pb-2">
+      <Card className="border-indigo-500/25 bg-slate-900/50 dark:bg-slate-900/70 shadow-lg">
+        <CardHeader className="pb-2 bg-slate-900/80 dark:bg-slate-900/90 border-b border-indigo-500/20">
           <div className="flex items-center justify-between w-full">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary-500" />
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-300">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
               Connect via Public Profile URL
             </CardTitle>
-            <span className="text-[11px] text-surface-400">
+            <span className="text-[11px] text-slate-400">
               Auto-detects LeetCode, Codeforces, GitHub, AtCoder, CodeChef, HackerRank
             </span>
           </div>
@@ -154,7 +158,7 @@ export const CodingProfilesPage: React.FC = () => {
                   if (previewData) setPreviewData(null);
                 }}
                 placeholder="Paste your public profile URL (e.g. https://leetcode.com/u/your-username/)"
-                className="w-full pl-3.5 pr-28 py-2.5 text-sm rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-white placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all font-mono"
+                className="w-full pl-3.5 pr-28 py-2.5 text-sm rounded-xl border border-indigo-500/30 bg-slate-950/80 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-mono"
               />
 
               <div className="absolute right-1.5 top-1.5 flex items-center gap-1.5">
@@ -211,47 +215,47 @@ export const CodingProfilesPage: React.FC = () => {
 
           {/* 3. Live Profile Preview Banner / Card */}
           {previewData && (
-            <div className="p-4 rounded-xl border border-primary-500/30 bg-primary-500/5 dark:bg-primary-500/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="p-4 rounded-xl border border-indigo-500/30 bg-slate-950/70 space-y-4 animate-in fade-in slide-in-from-top-2 shadow-inner">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   {previewData.avatarUrl ? (
                     <img
                       src={previewData.avatarUrl}
                       alt={previewData.username}
-                      className="w-12 h-12 rounded-xl object-cover border border-surface-300 dark:border-surface-700 shadow-sm"
+                      className="w-12 h-12 rounded-xl object-cover border border-indigo-500/30 shadow-sm"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-xl bg-primary-600/10 border border-primary-500/20 flex items-center justify-center text-primary-600">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
                       <Code2 className="w-6 h-6" />
                     </div>
                   )}
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-surface-900 dark:text-surface-100">
+                      <h3 className="text-sm font-bold text-slate-100">
                         {previewData.displayName || previewData.username}
                       </h3>
                       <Badge variant="primary" size="sm">
                         {previewData.platformDisplayName}
                       </Badge>
                       {previewData.autoSyncSupported ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
                           <CheckCircle2 className="w-3 h-3" /> Auto-Sync Supported
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-surface-500">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
                           <Info className="w-3 h-3" /> Profile Link Only
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-surface-500">
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                       <span>@{previewData.username}</span>
                       <span>•</span>
                       <a
                         href={previewData.canonicalProfileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-primary-600 hover:underline"
+                        className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:underline"
                       >
                         {previewData.canonicalProfileUrl} <ExternalLink className="w-3 h-3" />
                       </a>
@@ -284,30 +288,30 @@ export const CodingProfilesPage: React.FC = () => {
 
               {/* Warning / Disclosures */}
               {previewData.capabilityNotice && (
-                <div className="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-sky-700 dark:text-sky-300 flex items-start gap-2">
-                  <Globe className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="p-2.5 rounded-lg bg-sky-950/40 border border-sky-500/30 text-xs text-sky-300 flex items-start gap-2">
+                  <Globe className="w-4 h-4 shrink-0 mt-0.5 text-sky-400" />
                   <span>{previewData.capabilityNotice}</span>
                 </div>
               )}
 
               {previewData.warning && (
-                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/30 text-xs text-amber-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                   <span>{previewData.warning}</span>
                 </div>
               )}
 
-              {/* Preview Metrics Grid */}
+              {/* Preview Metrics Grid with Themed Color Sections */}
               {previewData.metrics && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
                   {previewData.metrics.problemsSolved != null && (
-                    <div className="p-2 rounded bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                      <span className="text-[10px] text-surface-400 block font-semibold">PROBLEMS SOLVED</span>
-                      <span className="text-sm font-bold text-surface-900 dark:text-white">
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 shadow-xs">
+                      <span className="text-[10px] text-emerald-400 block font-bold tracking-wider">PROBLEMS SOLVED</span>
+                      <span className="text-base font-extrabold text-emerald-200 mt-0.5 block">
                         {previewData.metrics.problemsSolved}
                       </span>
                       {previewData.metrics.easySolved != null && (
-                        <div className="text-[10px] text-surface-500 mt-0.5">
+                        <div className="text-[10px] text-emerald-400/80 mt-0.5 font-mono">
                           {previewData.metrics.easySolved}E / {previewData.metrics.mediumSolved}M / {previewData.metrics.hardSolved}H
                         </div>
                       )}
@@ -315,15 +319,15 @@ export const CodingProfilesPage: React.FC = () => {
                   )}
 
                   {previewData.metrics.currentRating != null && (
-                    <div className="p-2 rounded bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                      <span className="text-[10px] text-surface-400 block font-semibold flex items-center gap-1">
-                        <Trophy className="w-3 h-3 text-amber-500" /> CONTEST RATING
+                    <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 shadow-xs">
+                      <span className="text-[10px] text-amber-400 block font-bold tracking-wider flex items-center gap-1">
+                        <Trophy className="w-3 h-3 text-amber-400" /> CONTEST RATING
                       </span>
-                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                      <span className="text-base font-extrabold text-amber-200 mt-0.5 block">
                         {previewData.metrics.currentRating}
                       </span>
                       {previewData.metrics.maximumRating != null && (
-                        <div className="text-[10px] text-surface-500 mt-0.5">
+                        <div className="text-[10px] text-amber-400/80 mt-0.5 font-mono">
                           Peak: {previewData.metrics.maximumRating}
                         </div>
                       )}
@@ -331,34 +335,34 @@ export const CodingProfilesPage: React.FC = () => {
                   )}
 
                   {previewData.metrics.publicRepos != null && (
-                    <div className="p-2 rounded bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                      <span className="text-[10px] text-surface-400 block font-semibold flex items-center gap-1">
-                        <Star className="w-3 h-3 text-amber-500" /> REPOSITORIES & STARS
+                    <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 shadow-xs">
+                      <span className="text-[10px] text-purple-400 block font-bold tracking-wider flex items-center gap-1">
+                        <Star className="w-3 h-3 text-purple-400" /> REPOSITORIES & STARS
                       </span>
-                      <span className="text-sm font-bold text-surface-900 dark:text-white">
+                      <span className="text-base font-extrabold text-purple-200 mt-0.5 block">
                         {previewData.metrics.publicRepos} Repos
                       </span>
-                      <div className="text-[10px] text-surface-500 mt-0.5">
+                      <div className="text-[10px] text-purple-400/80 mt-0.5 font-mono">
                         ★ {previewData.metrics.totalStars || 0} Total Stars
                       </div>
                     </div>
                   )}
 
                   {previewData.metrics.followers != null && (
-                    <div className="p-2 rounded bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                      <span className="text-[10px] text-surface-400 block font-semibold flex items-center gap-1">
-                        <Users className="w-3 h-3 text-primary-500" /> COMMUNITY
+                    <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 shadow-xs">
+                      <span className="text-[10px] text-indigo-400 block font-bold tracking-wider flex items-center gap-1">
+                        <Users className="w-3 h-3 text-indigo-400" /> COMMUNITY
                       </span>
-                      <span className="text-sm font-bold text-surface-900 dark:text-white">
+                      <span className="text-base font-extrabold text-indigo-200 mt-0.5 block">
                         {previewData.metrics.followers} Followers
                       </span>
                     </div>
                   )}
 
                   {previewData.metrics.globalRank != null && (
-                    <div className="p-2 rounded bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                      <span className="text-[10px] text-surface-400 block font-semibold">GLOBAL RANK</span>
-                      <span className="text-sm font-bold text-surface-900 dark:text-white">
+                    <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 shadow-xs">
+                      <span className="text-[10px] text-cyan-400 block font-bold tracking-wider">GLOBAL RANK</span>
+                      <span className="text-base font-extrabold text-cyan-200 mt-0.5 block">
                         #{previewData.metrics.globalRank.toLocaleString()}
                       </span>
                     </div>
