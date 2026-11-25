@@ -14,6 +14,8 @@ public interface PlatformAccountRepository extends JpaRepository<PlatformAccount
 
     List<PlatformAccount> findAllByUserIdAndActiveTrueOrderByCreatedAtAsc(UUID userId);
 
+    List<PlatformAccount> findAllByUserIdAndActiveTrue(UUID userId);
+
     List<PlatformAccount> findAllByActiveTrue();
 
     Optional<PlatformAccount> findByIdAndUserIdAndActiveTrue(UUID id, UUID userId);

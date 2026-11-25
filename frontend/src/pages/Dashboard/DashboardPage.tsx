@@ -27,6 +27,9 @@ import { Goal } from '@/types/goal';
 import { Task } from '@/types/task';
 import { DailyProgress } from '@/types/progress';
 import { DashboardCodingOverview } from './components/DashboardCodingOverview';
+import { DashboardContestSection } from './components/DashboardContestSection';
+import { DashboardAchievementsSection } from './components/DashboardAchievementsSection';
+import { DashboardGitHubSection } from './components/DashboardGitHubSection';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -413,6 +416,15 @@ export const DashboardPage: React.FC = () => {
 
       {/* 4. CODING PERFORMANCE OVERVIEW (Step 6E Unified Integration) */}
       <DashboardCodingOverview />
+
+      {/* 5. CONTEST PERFORMANCE & RATING INTELLIGENCE (Phase 6F) */}
+      <DashboardContestSection />
+
+      {/* 6. CROSS-PLATFORM BADGES & ACHIEVEMENTS (Phase 6F) */}
+      <DashboardAchievementsSection />
+
+      {/* 7. GITHUB DEVELOPER ACTIVITY & COMMIT ANALYTICS (Phase 6F) */}
+      <DashboardGitHubSection />
 
       {/* Quick Log Progress Modal */}
       <Modal

@@ -36,6 +36,14 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
             "        count\n" +
             "      }\n" +
             "    }\n" +
+            "    badges {\n" +
+            "      id\n" +
+            "      name\n" +
+            "      displayName\n" +
+            "      icon\n" +
+            "      creationDate\n" +
+            "      category\n" +
+            "    }\n" +
             "  }\n" +
             "  userContestRanking(username: $username) {\n" +
             "    attendedContestsCount\n" +
@@ -45,6 +53,16 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
             "    topPercentage\n" +
             "    badge {\n" +
             "      name\n" +
+            "    }\n" +
+            "  }\n" +
+            "  userContestRankingHistory(username: $username) {\n" +
+            "    attended\n" +
+            "    rating\n" +
+            "    ranking\n" +
+            "    problemsSolved\n" +
+            "    contest {\n" +
+            "      title\n" +
+            "      startTime\n" +
             "    }\n" +
             "  }\n" +
             "}";
@@ -160,6 +178,55 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
             }
         }
 
+        // Extract badges
+        if (matchedUser.badges != null && !matchedUser.badges.isEmpty()) {
+            List<Map<String, Object>> badgesList = new ArrayList<>();
+            for (LeetCodeUserBadge b : matchedUser.badges) {
+                Map<String, Object> bm = new LinkedHashMap<>();
+                bm.put("id", b.id != null ? b.id : b.name);
+                bm.put("name", b.displayName != null ? b.displayName : b.name);
+                bm.put("description", "LeetCode Achievement Badge");
+                bm.put("icon", b.icon != null && b.icon.startsWith("http") ? b.icon : (b.icon != null ? "https://leetcode.com" + b.icon : null));
+                bm.put("category", b.category != null ? b.category : "BADGE");
+                bm.put("level", "Achievement");
+                if (b.creationDate != null) {
+                    bm.put("earnedDate", b.creationDate);
+                }
+                badgesList.add(bm);
+            }
+            if (!badgesList.isEmpty()) {
+                additionalStats.put("badges", badgesList);
+            }
+        }
+
+        // Extract contest history
+        if (response.data != null && response.data.userContestRankingHistory != null && !response.data.userContestRankingHistory.isEmpty()) {
+            List<Map<String, Object>> contestList = new ArrayList<>();
+            Double prevRating = null;
+            for (LeetCodeContestHistoryItem item : response.data.userContestRankingHistory) {
+                if (Boolean.TRUE.equals(item.attended) && item.contest != null && item.rating != null) {
+                    Map<String, Object> cm = new LinkedHashMap<>();
+                    cm.put("contestId", item.contest.title);
+                    cm.put("contestName", item.contest.title);
+                    if (item.contest.startTime != null) {
+                        cm.put("contestDate", Instant.ofEpochSecond(item.contest.startTime).toString());
+                    } else {
+                        cm.put("contestDate", Instant.now().toString());
+                    }
+                    cm.put("contestRank", item.ranking);
+                    cm.put("previousRating", prevRating != null ? prevRating : item.rating);
+                    cm.put("ratingChange", prevRating != null ? item.rating - prevRating : 0.0);
+                    cm.put("newRating", item.rating);
+                    cm.put("problemsSolved", item.problemsSolved != null ? item.problemsSolved : 0);
+                    contestList.add(cm);
+                    prevRating = item.rating;
+                }
+            }
+            if (!contestList.isEmpty()) {
+                additionalStats.put("contestHistory", contestList);
+            }
+        }
+
         String profileUrl = CodingPlatform.LEETCODE.buildProfileUrl(username);
 
         return ExternalProfileData.builder()
@@ -195,6 +262,7 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
     public static class LeetCodeData {
         public LeetCodeMatchedUser matchedUser;
         public LeetCodeContestRanking userContestRanking;
+        public List<LeetCodeContestHistoryItem> userContestRankingHistory;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -202,6 +270,7 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
         public String username;
         public LeetCodeProfile profile;
         public LeetCodeSubmitStats submitStatsGlobal;
+        public List<LeetCodeUserBadge> badges;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -236,6 +305,32 @@ public class LeetCodeAdapter implements CodingPlatformAdapter {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class LeetCodeBadge {
         public String name;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LeetCodeUserBadge {
+        public String id;
+        public String name;
+        public String displayName;
+        public String icon;
+        public String hoverText;
+        public String category;
+        public String creationDate;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LeetCodeContestHistoryItem {
+        public Boolean attended;
+        public Double rating;
+        public Integer ranking;
+        public Integer problemsSolved;
+        public LeetCodeContest contest;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LeetCodeContest {
+        public String title;
+        public Long startTime;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -57,9 +57,10 @@ public class GitHubAdapter implements CodingPlatformAdapter {
             throw new PlatformIntegrationException("Empty response received from GitHub API for: " + username);
         }
 
-        // 2. Fetch Public Repositories (/users/{username}/repos?per_page=100) for star count
+        // 2. Fetch Public Repositories (/users/{username}/repos?per_page=100)
         Integer totalStars = null;
         Integer totalForks = null;
+        List<Map<String, Object>> repoList = new ArrayList<>();
         try {
             String reposUrl = baseUrl + "/users/" + username + "/repos?per_page=100&type=owner&sort=updated";
             GitHubRepo[] repos = client.get(reposUrl, GitHubRepo[].class, headers);
@@ -69,6 +70,20 @@ public class GitHubAdapter implements CodingPlatformAdapter {
                 for (GitHubRepo repo : repos) {
                     if (repo.stargazersCount != null) stars += repo.stargazersCount;
                     if (repo.forksCount != null) forks += repo.forksCount;
+
+                    Map<String, Object> rMap = new LinkedHashMap<>();
+                    rMap.put("name", repo.name);
+                    rMap.put("fullName", repo.fullName != null ? repo.fullName : (username + "/" + repo.name));
+                    rMap.put("htmlUrl", repo.htmlUrl != null ? repo.htmlUrl : ("https://github.com/" + username + "/" + repo.name));
+                    rMap.put("description", repo.description);
+                    rMap.put("language", repo.language);
+                    rMap.put("starsCount", repo.stargazersCount != null ? repo.stargazersCount : 0);
+                    rMap.put("forksCount", repo.forksCount != null ? repo.forksCount : 0);
+                    rMap.put("isFork", Boolean.TRUE.equals(repo.fork));
+                    rMap.put("defaultBranch", repo.defaultBranch != null ? repo.defaultBranch : "main");
+                    rMap.put("pushedAt", repo.pushedAt);
+                    rMap.put("recentCommitsCount", 0);
+                    repoList.add(rMap);
                 }
                 totalStars = stars;
                 totalForks = forks;
@@ -77,7 +92,57 @@ public class GitHubAdapter implements CodingPlatformAdapter {
             log.debug("Could not calculate GitHub stars for {}: {}", username, ex.getMessage());
         }
 
-        // 3. Assemble Additional Statistics Map
+        // 3. Fetch Public Events for Commit Activity (/users/{username}/events/public?per_page=100)
+        Map<String, Integer> dailyCommitCounts = new TreeMap<>();
+        try {
+            String eventsUrl = baseUrl + "/users/" + username + "/events/public?per_page=100";
+            GitHubEvent[] events = client.get(eventsUrl, GitHubEvent[].class, headers);
+            if (events != null) {
+                for (GitHubEvent evt : events) {
+                    if ("PushEvent".equals(evt.type) && evt.createdAt != null) {
+                        String dateStr = evt.createdAt.substring(0, 10);
+                        int commitCount = (evt.payload != null && evt.payload.commits != null)
+                                ? evt.payload.commits.length
+                                : 1;
+                        dailyCommitCounts.put(dateStr, dailyCommitCounts.getOrDefault(dateStr, 0) + commitCount);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Could not fetch public events for {}: {}", username, ex.getMessage());
+        }
+
+        // 4. Assemble Badges
+        List<Map<String, Object>> badges = new ArrayList<>();
+        if (user.publicRepos != null && user.publicRepos > 0) {
+            badges.add(Map.of(
+                    "id", "github-repo-creator",
+                    "name", "Open Source Contributor",
+                    "description", "Authored " + user.publicRepos + " public repositories on GitHub",
+                    "category", "GITHUB",
+                    "level", user.publicRepos >= 20 ? "GOLD" : (user.publicRepos >= 5 ? "SILVER" : "BRONZE")
+            ));
+        }
+        if (totalStars != null && totalStars > 0) {
+            badges.add(Map.of(
+                    "id", "github-star-collector",
+                    "name", "Star Collector",
+                    "description", "Earned " + totalStars + " total stars across public repositories",
+                    "category", "GITHUB",
+                    "level", totalStars >= 50 ? "GOLD" : (totalStars >= 10 ? "SILVER" : "BRONZE")
+            ));
+        }
+        if (user.followers != null && user.followers >= 5) {
+            badges.add(Map.of(
+                    "id", "github-community-builder",
+                    "name", "Community Builder",
+                    "description", "Formed an open source following of " + user.followers + " developers",
+                    "category", "GITHUB",
+                    "level", user.followers >= 50 ? "GOLD" : (user.followers >= 20 ? "SILVER" : "BRONZE")
+            ));
+        }
+
+        // 5. Assemble Additional Statistics Map
         Map<String, Object> additionalStats = new LinkedHashMap<>();
         if (user.name != null && !user.name.trim().isEmpty()) additionalStats.put("displayName", user.name.trim());
         if (user.avatarUrl != null && !user.avatarUrl.trim().isEmpty()) additionalStats.put("avatarUrl", user.avatarUrl.trim());
@@ -91,6 +156,9 @@ public class GitHubAdapter implements CodingPlatformAdapter {
         if (user.location != null) additionalStats.put("location", user.location);
         if (user.bio != null) additionalStats.put("bio", user.bio);
         if (user.createdAt != null) additionalStats.put("accountCreatedAt", user.createdAt);
+        if (!repoList.isEmpty()) additionalStats.put("repositories", repoList);
+        if (!dailyCommitCounts.isEmpty()) additionalStats.put("dailyCommitCounts", dailyCommitCounts);
+        if (!badges.isEmpty()) additionalStats.put("badges", badges);
 
         String profileUrl = CodingPlatform.GITHUB.buildProfileUrl(username);
 
@@ -141,9 +209,40 @@ public class GitHubAdapter implements CodingPlatformAdapter {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class GitHubRepo {
         public String name;
+        @JsonProperty("full_name")
+        public String fullName;
+        @JsonProperty("html_url")
+        public String htmlUrl;
+        public String description;
+        public String language;
         @JsonProperty("stargazers_count")
         public Integer stargazersCount;
         @JsonProperty("forks_count")
         public Integer forksCount;
+        public Boolean fork;
+        @JsonProperty("default_branch")
+        public String defaultBranch;
+        @JsonProperty("pushed_at")
+        public String pushedAt;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class GitHubEvent {
+        public String type;
+        @JsonProperty("created_at")
+        public String createdAt;
+        public GitHubEventPayload payload;
+        public GitHubEventRepo repo;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class GitHubEventPayload {
+        public Map<String, Object>[] commits;
+        public Integer size;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class GitHubEventRepo {
+        public String name;
     }
 }
