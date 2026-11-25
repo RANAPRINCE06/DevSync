@@ -46,17 +46,17 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
 
   return (
     <div
-      className={`rounded-2xl bg-white dark:bg-surface-900 border transition-all duration-200 flex flex-col justify-between p-5 shadow-sm hover:shadow-md ${
+      className={`rounded-[3px] bg-white dark:bg-slate-900 border transition-all duration-200 flex flex-col justify-between p-3.5 shadow-xs ${
         isConnected
-          ? 'border-surface-200 dark:border-surface-800'
-          : 'border-dashed border-surface-300 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/40'
+          ? 'border-[#cfd5dc] dark:border-slate-800'
+          : 'border-dashed border-[#cfd5dc] dark:border-slate-700 bg-[#f8fafc] dark:bg-slate-900/40'
       }`}
     >
       <div>
         {/* Card Header: Platform Tag & Status */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${config.bgLight}`}>
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className={`px-2 py-0.5 rounded-[2px] text-xs font-bold border ${config.bgLight}`}>
               {config.displayName}
             </div>
 
@@ -342,14 +342,14 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
       </div>
 
       {/* Card Actions Footer */}
-      <div className="pt-3 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between gap-2">
+      <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
         {isConnected && account ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => onSync(account.id)}
                 disabled={!config.syncSupported || isSyncing || account.syncStatus === 'PENDING'}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1.5 disabled:opacity-40 transition-colors"
+                className="px-2 py-1 rounded-[2px] text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1 disabled:opacity-40 transition-colors"
                 title={
                   !config.syncSupported
                     ? 'Automated synchronization is unsupported for this platform'
@@ -357,7 +357,7 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
                 }
               >
                 <RefreshCw
-                  className={`w-3.5 h-3.5 ${
+                  className={`w-3 h-3 ${
                     isSyncing || account.syncStatus === 'PENDING' ? 'animate-spin' : ''
                   }`}
                 />
@@ -366,14 +366,14 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
 
               <button
                 onClick={() => onToggleHistory(account.id)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                className={`px-2 py-1 rounded-[2px] text-xs font-semibold flex items-center gap-1 transition-colors ${
                   isHistoryOpen
-                    ? 'bg-primary-500 text-white'
-                    : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'
+                    ? 'bg-[#1d4ed8] text-white'
+                    : 'text-blue-600 dark:text-blue-400 hover:bg-blue-500/10'
                 }`}
                 title="Inspect historical synchronization snapshots"
               >
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen className="w-3 h-3" />
                 {isHistoryOpen ? 'Hide' : 'History'}
               </button>
             </div>
@@ -381,16 +381,16 @@ export const PlatformPerformanceCard: React.FC<PlatformPerformanceCardProps> = (
             <button
               onClick={() => onDisconnect(account.id)}
               disabled={isDisconnecting}
-              className="p-1.5 text-xs font-medium text-surface-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
+              className="p-1 text-xs font-medium text-slate-400 hover:text-red-500 rounded-[2px] hover:bg-red-500/10 transition-colors disabled:opacity-40"
               title="Disconnect platform account"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </>
         ) : (
           <button
             onClick={() => onConnect(platformKey)}
-            className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 flex items-center justify-center gap-1.5 transition-colors"
+            className="w-full py-1.5 px-3 rounded-[2px] text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-1.5 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             Link {config.displayName} Profile

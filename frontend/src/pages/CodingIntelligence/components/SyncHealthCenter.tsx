@@ -45,27 +45,27 @@ export const SyncHealthCenter: React.FC<SyncHealthCenterProps> = ({
   const hasFailingAccount = activeAccounts.some((a) => a.syncStatus === 'FAILED');
 
   return (
-    <div className="p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm space-y-6">
+    <div className="p-4 rounded-[3px] bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 shadow-xs space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
-            <Activity className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-[2px] bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+            <Activity className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-surface-900 dark:text-white flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               Synchronization Health Center
               <span
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-[2px] border ${
                   hasFailingAccount
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
                 }`}
               >
                 {hasFailingAccount ? 'Attention Needed' : 'All Sync Channels Active'}
               </span>
             </h3>
-            <p className="text-xs text-surface-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Reliability layer monitoring: 6-hour scheduler, token-bucket rate limiters, in-memory cache, and retry executors.
             </p>
           </div>
@@ -74,7 +74,7 @@ export const SyncHealthCenter: React.FC<SyncHealthCenterProps> = ({
         <button
           onClick={onRefreshAll}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300 transition-colors self-start sm:self-auto disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[2px] border border-[#cbd5e1] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors self-start sm:self-auto disabled:opacity-50 shadow-2xs"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
           Refresh Health Status
@@ -83,19 +83,19 @@ export const SyncHealthCenter: React.FC<SyncHealthCenterProps> = ({
 
       {/* Reliability Architecture Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-3.5 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-800 flex items-start gap-3">
-          <Clock className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+        <div className="p-3 rounded-[3px] bg-[#f8fafc] dark:bg-slate-800/40 border border-[#cfd5dc] dark:border-slate-800 flex items-start gap-2.5">
+          <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
           <div>
-            <span className="text-xs font-bold text-surface-900 dark:text-white block">
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
               6-Hour Background Sync
             </span>
-            <span className="text-[11px] text-surface-500">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
               `PlatformSyncScheduler` triggers periodic updates across active accounts with in-flight concurrency locks.
             </span>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-surface-50 dark:bg-surface-800/40 border border-surface-200 dark:border-surface-800 flex items-start gap-3">
+        <div className="p-3 rounded-[3px] bg-[#f8fafc] dark:bg-slate-800/40 border border-[#cfd5dc] dark:border-slate-800 flex items-start gap-2.5">
           <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <div>
             <span className="text-xs font-bold text-surface-900 dark:text-white block">

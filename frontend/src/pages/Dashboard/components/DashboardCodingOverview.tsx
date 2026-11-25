@@ -129,21 +129,21 @@ export const DashboardCodingOverview: React.FC = () => {
   return (
     <div className="space-y-4 pt-2">
       {/* 1. Header Banner & Quick Actions */}
-      <div className="bg-gradient-to-r from-slate-900/95 via-indigo-950/70 to-slate-900/95 border border-indigo-500/30 p-4 rounded-xl shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 shadow-inner">
-            <Code2 className="w-5 h-5 text-indigo-400" />
+          <div className="w-8 h-8 rounded-[2px] bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+            <Code2 className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                 Coding Performance Overview
               </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-[2px] bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800">
                 7 Platforms
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Live competitive programming ratings, verified problem counts, and developer activity across connected profiles
             </p>
           </div>
@@ -157,19 +157,19 @@ export const DashboardCodingOverview: React.FC = () => {
             onClick={handleManualSyncAll}
             isLoading={Boolean(syncingId)}
             leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncingId ? 'animate-spin' : ''}`} />}
-            className="border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10"
+            className="rounded-[2px] h-7 text-xs"
           >
             Sync All
           </Button>
           <NavLink
             to="/coding-profiles"
-            className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition-colors flex items-center gap-1"
+            className="px-2.5 py-1 text-xs rounded-[2px] border border-[#cbd5e1] dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold transition-colors flex items-center gap-1"
           >
             Manage Profiles <ArrowUpRight className="w-3.5 h-3.5" />
           </NavLink>
           <NavLink
             to="/coding"
-            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-xs transition-colors flex items-center gap-1"
+            className="px-2.5 py-1 text-xs rounded-[2px] bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold shadow-xs transition-colors flex items-center gap-1"
           >
             Coding Intelligence <ChevronRight className="w-3.5 h-3.5" />
           </NavLink>
@@ -275,16 +275,16 @@ export const DashboardCodingOverview: React.FC = () => {
             return (
               <div
                 key={platform}
-                className="bg-slate-900/40 border border-dashed border-slate-700/80 p-3 rounded-[3px] flex flex-col justify-between opacity-75 hover:opacity-100 transition-opacity"
+                className="bg-[#f8fafc] dark:bg-slate-900/40 border border-dashed border-[#cfd5dc] dark:border-slate-700/80 p-3 rounded-[3px] flex flex-col justify-between opacity-75 hover:opacity-100 transition-opacity"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300">{meta.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{meta.name}</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                       Unlinked
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1.5">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
                     {meta.isAutomated
                       ? 'Automated statistics synchronization supported'
                       : 'Public profile linking supported'}
@@ -292,7 +292,7 @@ export const DashboardCodingOverview: React.FC = () => {
                 </div>
                 <NavLink
                   to="/coding-profiles"
-                  className="mt-3 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 self-start"
+                  className="mt-3 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 self-start"
                 >
                   <Plus className="w-3 h-3" /> Connect Account
                 </NavLink>

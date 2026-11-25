@@ -26,12 +26,12 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
 
   if (activeAccounts.length < 2) {
     return (
-      <div className="p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm text-center py-10">
-        <Columns className="w-8 h-8 text-surface-400 mx-auto mb-2 opacity-50" />
-        <h4 className="text-sm font-semibold text-surface-900 dark:text-surface-100">
+      <div className="p-4 rounded-[3px] bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 shadow-xs text-center py-8">
+        <Columns className="w-6 h-6 text-slate-400 mx-auto mb-2 opacity-50" />
+        <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
           Platform Comparison Unavailable
         </h4>
-        <p className="text-xs text-surface-500 mt-1 max-w-sm mx-auto">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
           Connect at least two coding platforms to compare platform-specific metrics side-by-side.
         </p>
       </div>
@@ -41,21 +41,21 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
   const comparedAccounts = activeAccounts.filter((a) => selectedPlatforms.includes(a.platform));
 
   return (
-    <div className="p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 shadow-sm space-y-5">
+    <div className="p-4 rounded-[3px] bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 shadow-xs space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold text-surface-900 dark:text-white flex items-center gap-2">
-            <Columns className="w-5 h-5 text-primary-500" />
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Columns className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             Side-by-Side Platform Comparison
           </h3>
-          <p className="text-xs text-surface-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Compare metrics across your connected platforms. Ratings are kept strictly separate.
           </p>
         </div>
 
         {/* Platform Selection Toggles */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs text-surface-400 font-medium mr-1">Select:</span>
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Select:</span>
           {activeAccounts.map((acc) => {
             const isSelected = selectedPlatforms.includes(acc.platform);
             const cfg = platformConfigs[acc.platform];
@@ -63,10 +63,10 @@ export const PlatformComparisonSection: React.FC<PlatformComparisonSectionProps>
               <button
                 key={acc.platform}
                 onClick={() => togglePlatform(acc.platform)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all ${
+                className={`px-2 py-0.5 rounded-[2px] text-xs font-semibold border flex items-center gap-1 transition-all ${
                   isSelected
-                    ? `${cfg.bgLight} font-semibold shadow-xs`
-                    : 'bg-surface-100 dark:bg-surface-800 text-surface-500 border-transparent hover:text-surface-800 dark:hover:text-surface-200'
+                    ? `${cfg.bgLight} shadow-2xs`
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 {isSelected && <Check className="w-3 h-3" />}

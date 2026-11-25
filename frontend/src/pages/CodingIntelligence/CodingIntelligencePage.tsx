@@ -235,24 +235,26 @@ export const CodingIntelligencePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-4 pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-surface-900 dark:text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-primary-950/40">
-              <Code2 className="w-5 h-5" />
-            </div>
-            Coding Intelligence Experience
-          </h1>
-          <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
-            Track multi-platform problem solving, competitive ratings, GitHub repositories, and synchronization reliability.
-          </p>
+      <div className="bg-white dark:bg-slate-900 border border-[#cfd5dc] dark:border-slate-800 p-3.5 rounded-[3px] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-[2px] bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+            <Code2 className="w-4 h-4" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              Coding Intelligence Experience
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Track multi-platform problem solving, competitive ratings, GitHub repositories, and synchronization reliability.
+            </p>
+          </div>
         </div>
 
         <button
           onClick={() => refetch()}
-          className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300 transition-colors self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-[2px] border border-[#cbd5e1] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors self-start sm:self-auto shadow-2xs"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAccounts ? 'animate-spin' : ''}`} />
           Refresh Data
@@ -260,13 +262,13 @@ export const CodingIntelligencePage: React.FC = () => {
       </div>
 
       {/* Navigation Pills */}
-      <div className="flex items-center gap-2 border-b border-surface-200 dark:border-surface-800 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-1.5 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+          className={`px-3 py-1.5 rounded-[2px] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
             activeTab === 'dashboard'
-              ? 'bg-primary-600 text-white shadow-sm'
-              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+              ? 'bg-[#1d4ed8] text-white shadow-2xs'
+              : 'bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#cfd5dc] dark:border-slate-700'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -275,10 +277,10 @@ export const CodingIntelligencePage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+          className={`px-3 py-1.5 rounded-[2px] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
             activeTab === 'analytics'
-              ? 'bg-primary-600 text-white shadow-sm'
-              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+              ? 'bg-[#1d4ed8] text-white shadow-2xs'
+              : 'bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#cfd5dc] dark:border-slate-700'
           }`}
         >
           <BarChart3 className="w-3.5 h-3.5" />
@@ -287,10 +289,10 @@ export const CodingIntelligencePage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('comparison')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+          className={`px-3 py-1.5 rounded-[2px] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
             activeTab === 'comparison'
-              ? 'bg-primary-600 text-white shadow-sm'
-              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+              ? 'bg-[#1d4ed8] text-white shadow-2xs'
+              : 'bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#cfd5dc] dark:border-slate-700'
           }`}
         >
           <Columns className="w-3.5 h-3.5" />
@@ -299,10 +301,10 @@ export const CodingIntelligencePage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('syncHealth')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shrink-0 ${
+          className={`px-3 py-1.5 rounded-[2px] text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
             activeTab === 'syncHealth'
-              ? 'bg-primary-600 text-white shadow-sm'
-              : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800'
+              ? 'bg-[#1d4ed8] text-white shadow-2xs'
+              : 'bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#cfd5dc] dark:border-slate-700'
           }`}
         >
           <Activity className="w-3.5 h-3.5" />
